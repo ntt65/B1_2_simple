@@ -1,17 +1,233 @@
-# b1-2 Bookmark Keeper
+# B1-2 Bookmark Keeper
 
-React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카테고리별로 저장하고, 메모를 남기고, 목록/상세/등록/수정/삭제를 수행한다. 목록·상세는 공개하며, 등록·수정·삭제에는 로그인이 필요하다. 로그인 사용자끼리는 북마크를 공유한다.
+React와 Supabase로 만든 북마크 관리 SPA다. 링크를 저장하고 카테고리로 분류하며 메모를 남긴다. 목록과 상세는 공개하고, 등록·수정·삭제에는 로그인이 필요하다.
 
-- **현재 배포 URL**: https://b1-2-simple.vercel.app
-- **소스 코드**: https://github.com/ntt65/B1_2_simple
-- **참고 구현**: https://github.com/ntt65/B1-2
-- **실행 화면**: [스크린샷 보기](#실행-화면)
-- **학습·발표자료**: [QA 문서와 미션·평가 PPTX·PDF](#발표자료)
-- **설정 바로가기**: [Vercel과 Supabase 연동 및 배포 가이드](#vercel과-supabase-연동-및-배포-완벽-가이드) · [로컬 실행 방법](#로컬-실행-방법)
+- **배포 사이트:** [b1-2-simple.vercel.app](https://b1-2-simple.vercel.app)
+- **저장소:** [ntt65/B1_2_simple](https://github.com/ntt65/B1_2_simple)
+- **비교 대상:** [ntt65/B1-2](https://github.com/ntt65/B1-2)
+- **문서 기준일:** 2026-11-10
 
-2026-11-10에 미구현 보너스였던 사용자 Context와 Supabase Auth를 추가했다. 현재 문서의 구현 설명은 이 변경을 반영한다. 아래의 과거 실행·배포 기록은 인증 추가 전 기록이며, 이번 변경의 실제 원격 DB 적용·배포 CRUD 검증 결과를 뜻하지 않는다.
+[로컬 실행](#로컬-실행-방법) · [기능과 권한](#기능과-권한) · [라우트](#라우트) · [코드 구조](#프로젝트-구조) · [실행 화면](#실행-화면) · [발표자료](#발표자료) · [배포 가이드](#vercel과-supabase-연동-및-배포-완벽-가이드) · [검증 결과](#현재-배포-확인-범위)
 
-등록 오류 수정 코드 [18f603e](https://github.com/ntt65/B1_2_simple/commit/18f603e)의 Vercel 배포 완료와 실제 배포 JavaScript 반영을 확인했다. 사용자 SQL 적용 후 평가 계정의 원격 API 로그인·CRUD도 모두 통과했다.
+## 프로젝트 요약
+
+| 항목 | 현재 구성 |
+| --- | --- |
+| 프론트엔드 | React 19, JavaScript JSX, React Router 7, 순수 CSS |
+| 개발·빌드 | Vite 8, Node.js 26에서 검증 |
+| 백엔드 | Supabase PostgreSQL·PostgREST·Auth |
+| 화면 | 8개 라우트와 8개 페이지, 등록·수정·프로필 보호 |
+| 재사용 UI | components 파일 15개, prop으로 표시·동작이 달라지는 컴포넌트 13개 |
+| 커스텀 훅 | useBookmarks, useBookmark, useAuth |
+| 테스트 | Vitest·Testing Library, 8개 파일의 62개 테스트 통과 |
+| 호스팅 | Vercel, SPA rewrite 적용 |
+
+사용자 Context와 인증 보너스까지 구현했다. 실제 API 로그인·CRUD 확인 기록과 자동 테스트, 사용자 제공 화면 캡처를 구분해 [검증 결과](#현재-배포-확인-범위)에 기록했다.
+
+## 로컬 실행 방법
+
+### 1. 설치와 환경변수 준비
+
+Node.js 26에서 설치·빌드·테스트를 확인했다. 테스트 도구의 지원 범위는 Node.js 22.22.2 이상(22.x), 24.15.0 이상(24.x), 또는 26 이상이다. 실제 의존성과 명령은 [package.json](./package.json)과 [잠금 파일](./package-lock.json)을 따른다.
+
+```bash
+git clone https://github.com/ntt65/B1_2_simple.git
+cd B1_2_simple
+npm ci
+```
+
+Windows PowerShell에서 환경변수 템플릿을 복사한다.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+macOS·Linux에서는 `cp .env.example .env`를 사용한다. `.env`를 열어 사용할 Supabase 프로젝트의 값을 입력한다.
+
+```dotenv
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-project-public-key
+# 선택: 가입 확인 메일이 돌아올 앱의 origin. 생략하면 현재 브라우저 origin 사용
+# VITE_APP_URL=https://b1-2-simple.vercel.app
+```
+
+URL과 공개 키는 **같은 Supabase 프로젝트**에서 가져온다. 기존 변수명 `VITE_SUPABASE_ANON_KEY`에 Publishable key(`sb_publishable_...`) 또는 legacy anon key를 입력할 수 있다. `VITE_` 값은 브라우저 번들에 포함되므로 서비스 역할 키나 계정 비밀번호를 넣지 않는다. [.env.example](./.env.example)에는 실제 연결값이 없으며 환경변수 파일은 [.gitignore](./.gitignore)로 제외한다.
+
+### 2. Supabase 테이블 준비
+
+새 환경을 구성하거나 기존 테이블을 앱의 계약에 맞출 때 다음 순서로 진행한다.
+
+1. Supabase SQL Editor에서 [diagnose-bookmarks.sql](./supabase/diagnose-bookmarks.sql)을 실행해 기존 컬럼·제약·기본값·권한·정책을 확인하고 결과를 보관한다.
+2. [schema.sql](./schema.sql) 전체를 검토한 뒤 실행한다. 이 파일은 신규 생성과 기존 `public.bookmarks`의 누락 컬럼·기본값 보완, 공개 조회·로그인 사용자 쓰기 정책을 함께 처리한다.
+3. 진단 결과를 다시 확인하고 실제 로그인 세션으로 등록·조회·수정·삭제를 검사한다.
+
+전체 `schema.sql`은 **bookmarks의 기존 RLS 정책을 교체한다.** 기존 데이터·컬럼 타입·NOT NULL·기존 외래키를 임의로 재작성하지는 않는다. 새 컬럼에 기본값이 들어가는 경우와 기존 숫자 ID의 자동 증가 설정은 아래 [데이터 모델](#데이터-모델)과 [SQL 트러블슈팅](#3-sql-트러블슈팅)을 확인한다. 파일 저장만으로 원격 DB가 바뀌지는 않는다.
+
+컬럼과 기본값이 이미 맞고 권한만 전환할 때는 [policies-authenticated-writes.sql](./supabase/policies-authenticated-writes.sql)을 사용할 수 있다. 전체 `schema.sql`에는 이 권한 전환이 포함되어 있다.
+
+### 3. 개발 서버와 검사
+
+```bash
+npm run dev
+```
+
+기본 주소는 `http://localhost:5173`이며 실제 주소는 터미널에 표시된다. 포트가 달라진 상태에서 메일 인증을 테스트한다면 해당 origin도 Supabase Redirect URLs에 허용한다. 환경변수를 수정한 뒤에는 개발 서버를 재시작한다. 설정 누락이나 URL 형식 오류 등으로 클라이언트를 만들 수 없으면 `SetupNotice`를 표시한다. 키의 유효성은 실제 요청 결과로 확인한다.
+
+| 명령 | 용도 |
+| --- | --- |
+| `npm run dev` | 개발 서버 |
+| `npm run lint` | Oxlint 검사 |
+| `npm test` | Vitest 자동 테스트 |
+| `npm run build` | 운영 빌드, 결과는 dist |
+| `npm run preview` | 빌드 결과를 로컬에서 확인 |
+
+PowerShell 실행 정책으로 `npm.ps1`이 막히면 `npm.cmd ci`, `npm.cmd run dev`, `npm.cmd test`처럼 실행한다. 로컬 preview 주소에서 메일 인증도 확인하려면 그 복귀 주소를 별도로 허용해야 한다.
+
+## 기능과 권한
+
+이 앱은 **공유 북마크 서비스**다. 로그인한 사용자는 다른 사용자가 등록한 북마크도 수정·삭제할 수 있다.
+
+| 기능 | 비로그인 사용자 | 로그인 사용자 |
+| --- | --- | --- |
+| 목록·상세·카테고리 필터 | 사용 가능 | 사용 가능 |
+| 북마크 등록 | 로그인으로 이동 | 사용 가능 |
+| 북마크 수정·삭제 | 로그인 필요 | 모든 북마크에 사용 가능 |
+| 내 프로필·로그아웃 | 로그인으로 이동 | 현재 사용자 정보 표시 |
+| 회원가입·로그인 | 사용 가능 | 로그인 화면 접근 시 내부 복귀 경로로 이동 |
+
+`ProtectedRoute`가 등록·수정·프로필 접근을 제어하고, 각 쓰기 핸들러는 요청 직전에 세션을 확인한다. 최종 접근 권한은 DB의 GRANT와 RLS가 검사한다. 앱은 등록 시 `user_id`를 세션 사용자의 ID로 기록하지만, 현재 DB 정책은 작성자 소유권을 강제하는 정책이 아니다.
+
+### CRUD와 화면 갱신
+
+| 동작 | 요청 위치 | 처리와 다음 화면 |
+| --- | --- | --- |
+| 목록 조회 | useBookmarks | select 후 created_at 내림차순, 목록 렌더 |
+| 상세 조회 | useBookmark(id) | id로 maybeSingle 조회, 없으면 찾을 수 없음 안내 |
+| 등록 | BookmarkNewPage | title·url·memo·category와 user_id 저장, 새 상세로 이동 |
+| 수정 | BookmarkEditPage | id로 update 후 반환 행 확인, 상세로 이동 |
+| 삭제 | BookmarkDetailPage | id로 delete 후 반환 행 확인, 목록으로 이동 |
+
+수정·삭제의 반환 0행은 성공으로 처리하지 않는다. 등록·수정·삭제 후 이동한 화면에 닫을 수 있는 성공 안내를 보여준다. 삭제 후에는 목록 페이지가 다시 마운트되어 조회하고, 수정 후에는 상세 페이지가 다시 조회한다. 재시도 버튼은 조회 훅의 `refetch()`를 직접 호출한다.
+
+### 폼·오류·접근성
+
+| 항목 | 현재 동작 |
+| --- | --- |
+| 필수값 | 제목·URL의 trim 결과가 비어 있으면 제출 차단 |
+| URL | 파싱 가능한 HTTP·HTTPS 절대 주소만 허용. 기존 비허용 URL은 상세에서 링크로 열지 않음 |
+| 메모 | 선택 입력 |
+| 카테고리 | 일반 UI에서는 개발·디자인·글·영상·etc 중 선택. 별도 값 검증이나 DB CHECK 제약은 현재 스크립트에 없음 |
+| 제출 중 | 입력·버튼 비활성화, 처리 중 텍스트와 aria-busy |
+| 요청 실패 | 입력 유지와 오류 표시. 등록 오류는 알려진 코드·컬럼을 안내하고 원본 행·토큰은 표시하지 않음 |
+| 입력 오류 | label과 id 연결, aria-invalid·aria-describedby, 필드 가까이에 메시지 표시 |
+| 공통 상태 | Loading은 role=status, ErrorState는 role=alert, 성공 안내는 role=status |
+
+`Loading`과 `ErrorState`는 목록·상세·수정에서 공통으로 사용한다. **목록의 빈 결과**는 `BookmarkList` 안의 `EmptyState`가 등록·필터 초기화 액션과 함께 안내한다. 상세·수정에서 해당 ID가 없으면 `ErrorState`로 안내한다.
+
+로그인 화면의 모드 선택은 밑줄형 탭으로, 제출은 입력창 너비의 보라색 버튼으로 구분했다. 로그인 탭에는 선택 상태와 키보드 포커스 표시가 있다.
+
+## 라우트
+
+| 경로 | 페이지 | 접근·역할 |
+| --- | --- | --- |
+| `/` | HomePage | 공개, 서비스 소개 |
+| `/bookmarks` | BookmarksPage | 공개, 목록·필터 |
+| `/bookmarks/:id` | BookmarkDetailPage | 공개, 상세·로그인 사용자 쓰기 메뉴 |
+| `/bookmarks/new` | BookmarkNewPage | 로그인 필요, 등록 |
+| `/bookmarks/:id/edit` | BookmarkEditPage | 로그인 필요, 수정 |
+| `/login` | LoginPage | 로그인·가입·내부 경로 복귀 |
+| `/profile` | ProfilePage | 로그인 필요, 사용자 정보·로그아웃 |
+| `*` | NotFoundPage | 정의하지 않은 경로 안내 |
+
+경로는 [App.jsx](./src/App.jsx), 공통 메뉴는 [Layout.jsx](./src/components/Layout.jsx)에 있다. 홈과 북마크 목록의 `NavLink`는 `end`를 지정한다. 정적 경로 `/bookmarks/new`와 동적 경로 `:id`는 Router가 구분한다.
+
+Vercel의 rewrite는 직접 URL 요청에 앱 HTML을 제공한다. 따라서 잘못된 주소도 HTTP 200으로 HTML을 받은 뒤 React의 Not Found 화면을 표시할 수 있다. HTTP 상태와 앱 화면의 판단을 구분한다.
+
+## 프로젝트 구조
+
+```text
+src/
+├── App.jsx              # 8개 경로와 보호 라우트 연결
+├── main.jsx             # BrowserRouter·AuthProvider·StrictMode
+├── index.css            # 공통·반응형·다크 모드 스타일
+├── pages/               # 8개 페이지, 요청과 이동 조정
+├── components/          # 15개 UI·레이아웃·보호·설정 안내 파일
+├── hooks/               # useBookmarks, useBookmark, useAuth
+├── context/             # AuthContext
+└── lib/                 # Supabase 연결·카테고리·URL·오류·복귀 주소 검증
+supabase/
+├── diagnose-bookmarks.sql
+└── policies-authenticated-writes.sql
+schema.sql               # bookmarks 생성·복구·권한 설정
+tests/                   # 외부 API 없이 실행하는 자동 테스트
+screenshot/              # 사용자 제공 화면 7장
+docs/                    # 미션·평가·기술·운영 문서
+output/
+├── presentations/       # 미션·평가 PPTX
+└── pdf/                 # 같은 내용의 발표 PDF
+```
+
+역할별 분리는 이 프로젝트의 설계다. React가 `pages/components/hooks` 폴더 이름을 강제하는 것은 아니다. `pages`는 화면의 요청·이동을 조정하고, 공통 UI를 `components`에서 재사용한다. `Layout`·링크 카드·`ProtectedRoute`는 Router 또는 인증 Context도 사용하므로 모든 UI가 props만 사용하는 순수 컴포넌트인 것은 아니다.
+
+components 파일 15개 중 prop에 따라 표시·동작이 달라지는 13개는 `Button`, `Input`, `Textarea`, `Select`, `Card`, `Loading`, `ErrorState`, `EmptyState`, `CategoryFilter`, `BookmarkCard`, `BookmarkList`, `BookmarkForm`, `ProtectedRoute`다. `Layout`과 `SetupNotice`는 이 prop 기준 집계에서 제외한다. 등록·수정은 같은 `BookmarkForm`을 사용한다.
+
+## React 구조와 데이터 흐름
+
+### 커스텀 훅
+
+| 훅 | 반환 값 | 사용 위치·역할 |
+| --- | --- | --- |
+| useBookmarks() | bookmarks, loading, error, refetch | 목록 조회와 재시도 |
+| useBookmark(id) | bookmark, loading, error, refetch | 상세·수정 화면의 단건 조회 |
+| useAuth() | user, loading, sessionError, signIn, signUp, signOut | AuthProvider의 공유 인증 상태 사용 |
+
+조회 훅을 호출한 컴포넌트마다 로컬 상태는 독립적이다. 훅 코드를 재사용한다고 목록 상태가 전역으로 공유되지는 않는다. `useAuth`는 같은 AuthProvider의 Context를 읽으므로 여러 화면이 같은 사용자 상태를 사용한다.
+
+### 상태 배치와 요청 처리
+
+| 상태 | 위치 | 화면에 반영되는 예 |
+| --- | --- | --- |
+| bookmarks·bookmark·loading·error | 조회 훅 | 목록·상세·로딩·실패 표시 |
+| category | BookmarksPage | useMemo로 필터 목록 계산 |
+| values·errors·submitting | BookmarkForm | 입력·검증 오류·제출 중 표시 |
+| submitError·deleteError | 페이지 | 저장·삭제 실패 안내 |
+| user·loading·sessionError | AuthProvider | 헤더·프로필·보호 경로 분기 |
+| state.notice와 닫기 상태 | Router·Layout | 이동 후 성공 안내 표시·숨김 |
+
+Effect는 커밋 후 실행하며 의존성을 이전 값과 `Object.is`로 비교한다. `useCallback`은 조회 함수의 참조를 유지하고, 단건 조회의 `id`가 바뀌면 새 조회로 연결한다. 개발 StrictMode의 추가 setup·cleanup, 재마운트, 사용자의 재시도를 구분해야 하므로 조회가 항상 한 번만 실행된다고 설명하지 않는다.
+
+두 조회 훅은 요청 순서와 마운트 여부를 확인해 늦은 응답이 최신 상태를 덮지 않게 한다. `useBookmark`는 ID가 바뀐 첫 렌더에서도 이전 항목을 새 항목처럼 보여주지 않도록 가드한다. 필터 `useMemo`와 조회 `useCallback`을 적용했으며, 성능 개선 수치를 별도로 측정한 것은 아니다.
+
+```text
+새 북마크 경로 진입
+  보호 라우트의 세션 확인과 로그인 복귀
+  BookmarkForm의 입력 상태 변경
+  제출 검증과 submitting 표시
+  페이지에서 현재 사용자 확인 후 INSERT
+  성공: 새 상세와 안내 표시 / 실패: 입력 유지와 오류 표시
+```
+
+구현 코드는 [조회 훅](./src/hooks/useBookmark.js), [공용 폼](./src/components/BookmarkForm.jsx), [등록 페이지](./src/pages/BookmarkNewPage.jsx)에서 확인한다. 자세한 개념 설명과 문항별 발표 답변은 [기술 문서](./docs/tech.md), [미션 QA](./docs/b1_2_mission_QA.md), [평가 QA](./docs/b1_2_evaluation_questions_QA.md)에 정리했다.
+
+## 데이터 모델
+
+앱은 `public.bookmarks`의 다음 7개 컬럼을 사용한다. INSERT 필드는 `title`, `url`, `memo`, `category`, `user_id`이며 ID와 생성 시각은 DB 기본값을 사용한다.
+
+| 컬럼 | schema.sql의 신규 테이블 정의 | 용도 |
+| --- | --- | --- |
+| id | uuid, PK, gen_random_uuid() | 상세·수정·삭제 식별 |
+| title | text, NOT NULL | 제목 |
+| url | text, NOT NULL | 링크 |
+| memo | text, nullable | 선택 메모 |
+| category | text, NOT NULL, 기본 etc | 분류 |
+| user_id | uuid, 기본 auth.uid(), auth.users 참조 | 작성자 기록 |
+| created_at | timestamptz, NOT NULL, 기본 now() | 등록 시각·정렬 |
+
+위 표는 **신규 생성 정의**다. 기존 테이블의 숫자 ID·타입·identity·제약을 UUID로 변환하지 않는다. UUID ID의 기본값만 없는 경우는 보완하지만, 자동 증가가 없는 기존 숫자 ID는 진단 후 별도로 처리해야 한다. 새로 추가되는 category·created_at은 기존 행에도 기본값이 채워질 수 있다.
+
+신규 user_id 외래키는 계정 삭제 시 SET NULL이다. 이미 존재하는 외래키의 삭제 동작은 ADD COLUMN IF NOT EXISTS로 바뀌지 않는다. 앱은 `memo`를 사용하며, 필드 이름을 추측해 `notes`·`description`을 추가하는 방식으로 해결하지 않는다.
+
+Supabase를 선택한 이유는 이 프로젝트의 테이블과 SQL, 인증을 한곳에서 관리하고 React SDK로 원격 요청을 연결하기 편했기 때문이다. 같은 프로젝트를 쓰는 두 앱의 테이블 구분과 공유되는 인증 설정은 [현재 운영 구조](#현재-운영-구조-vercel-2개와-supabase-1개)를 참고한다.
 
 ---
 
@@ -24,6 +240,8 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 서비스 소개와 북마크 목록·새 북마크 등록으로 이동하는 시작 화면이다.
 
 ![Bookmark Keeper 홈 화면](./screenshot/bookmark_start.png)
+
+<a id="evaluation-account"></a>
 
 ### 회원가입·로그인 화면과 평가용 계정
 
@@ -81,364 +299,6 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 | 평가 발표 | 평가 17문항과 6번 평가결과 | [평가 QA](./docs/b1_2_evaluation_questions_QA.md) | [19장 발표자료](./output/presentations/b1_2_evaluation_presentation.pptx) | [19쪽 PDF](./output/pdf/b1_2_evaluation_presentation.pdf) |
 
 QA 문서의 발표용 답변·근거 파일·시연 포인트를 함께 참고한다. 번호·코드·발표 파일 검사와 저장소 반영 결과는 [최종 체크리스트](./docs/b1_2_presentation_checklist.md)에 기록한다.
-
----
-
-## 미션 구현 결과
-
-### 필수 요구사항 체크리스트
-
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 라우팅 5개 이상 | ✅ | 8개 라우트 (`/`, `/bookmarks`, `/bookmarks/new`, `/bookmarks/:id`, `/bookmarks/:id/edit`, `/login`, `/profile`, `*`) |
-| 목록/상세 페이지 분리 | ✅ | `/bookmarks` (목록) ↔ `/bookmarks/:id` (상세) |
-| Not Found 페이지 | ✅ | `*` → `NotFoundPage` (404 메시지 + 홈으로 링크) |
-| 재사용 컴포넌트 8개 이상 | ✅ | 기존 공용 UI 13개와 `ProtectedRoute` (등록·수정·프로필 경로에서 재사용) |
-| 커스텀 훅 1개 이상 | ✅ | `useBookmarks()`, `useBookmark(id)`, `useAuth()` 3개 |
-| CRUD 전체 | ✅ 원격 API 검증 완료 | 전체 `schema.sql` 적용 후 평가 계정의 API 로그인·등록·단건 조회·수정·삭제 성공, 검사 행 모두 정리 |
-| 폼 필수값 검증 | ✅ | `validate()` — title, url 필수값과 HTTP/HTTPS URL 형식 검증 |
-| 폼 에러 메시지 표시 | ✅ | 필드 바로 아래 인라인 에러 메시지, `invalid` 클래스로 테두리 강조 |
-| 제출 중 상태 표시 | ✅ | `submitting: true` → 버튼 비활성화 + "처리 중..." 텍스트 |
-| 로딩/에러/빈 상태 통일 | ✅ | `Loading`, `ErrorState`, `EmptyState` 공용 컴포넌트로 모든 화면 통일 |
-| 상태 → 렌더 변화 3곳 이상 | ✅ | 카테고리 필터, 로딩, 검증 에러, 제출 중, 삭제 에러, 사용자 상태, 성공 안내 |
-| 배포 | 수정 코드 배포·원격 API 로그인/CRUD 확인 | Vercel 완료 상태와 실제 배포 JavaScript 반영 확인. 브라우저 전체 UI 조작·신규 확인 메일 복귀는 별도 검증 필요 |
-| 보너스: 성능 최적화 | ✅ | `useMemo` (필터 결과), `useCallback` (refetch 메모이제이션) |
-| 보너스: 전역 상태 | ✅ | `AuthContext`의 사용자·세션 확인 상태를 헤더·로그인·프로필·보호 라우트에서 공유 |
-| 보너스: 인증 | ✅ | Supabase 이메일 로그인·회원가입·로그아웃, 보호 라우트와 로그인 후 원래 경로 복귀 |
-
----
-
-### 과제 목표 달성
-
-> 미션이 끝난 후 스스로 설명할 수 있어야 하는 5가지 항목
-
-**1. 컴포넌트를 어떤 기준으로 쪼갰는가**
-
-두 기준으로 나눴다. ① `pages/`는 라우트 1개에 대응하며 Supabase 요청·`navigate` 같은 부수 효과를 담당한다. `components/`는 버튼·폼·상태 표시처럼 재사용하는 화면 조각을 담당한다. `Layout`·링크 카드·`ProtectedRoute`처럼 라우팅과 연결되는 컴포넌트도 있다. ② 같은 UI가 여러 곳에서 반복되면 컴포넌트로 추출했다 — 로딩/에러/빈 상태 3종, 등록·수정 공용 폼 `BookmarkForm`.
-
-**2. props와 state의 차이, 상태를 어디에 두었는가**
-
-- props: 부모가 자식에게 내려주는 읽기 전용 값. `BookmarkForm`이 받는 `initialValues`, `onSubmit`, `submitError`가 예시다.
-- state: 컴포넌트 자신이 소유하고 변경할 수 있는 값. 비동기 데이터(`bookmarks`, `loading`, `error`)는 커스텀 훅이 소유, 카테고리 필터(`category`)는 `BookmarksPage`가 소유, 폼 값(`values`, `errors`, `submitting`)은 `BookmarkForm`이 소유한다.
-
-**상태 배치 결정 기준**: 그 상태가 변할 때 리렌더가 필요한 컴포넌트 중 가장 가까운 공통 부모에 둔다. 로그인 사용자는 헤더·프로필·보호 라우트 등 여러 화면에서 필요하므로 `AuthContext`에서 공유한다. 폼 입력과 카테고리 필터는 해당 화면의 로컬 상태로 유지한다.
-
-**3. useEffect가 언제 실행되고 의존성 배열이 어떤 역할을 하는가**
-
-```js
-// useBookmarks — 마운트 1회
-const refetch = useCallback(async () => { /* Supabase select */ }, []);
-useEffect(() => { refetch(); }, [refetch]); // refetch 불변 → 1회
-
-// useBookmark(id) — id 바뀔 때마다 재조회
-const refetch = useCallback(async () => { /* eq("id", id) */ }, [id]);
-useEffect(() => { refetch(); }, [refetch]); // id 바뀌면 refetch 새 참조 → 재실행
-```
-
-의존성 배열은 이전/현재 값을 `Object.is`로 비교해 달라진 게 있으면 effect를 재실행한다. `useCallback`으로 `refetch`를 메모이제이션하지 않으면 렌더마다 새 함수가 만들어져 무한 루프가 생긴다.
-
-예제의 최초 1회 조회는 일반적인 마운트 흐름을 뜻한다. 개발 모드의 StrictMode에서는 Effect가 추가 실행될 수 있으며, 세부 동작은 [tech.md](./docs/tech.md#react-strictmode-개발-동작)를 참고한다.
-
-**흔한 실수 — `useCallback` 없이 함수를 의존성에 넣는 경우:**
-
-```js
-// ❌ 잘못된 패턴 — 무한 루프 발생
-async function refetch() { /* Supabase 요청 */ }  // 렌더마다 새 함수 참조 생성
-useEffect(() => { refetch(); }, [refetch]);         // refetch 항상 달라 보임 → 무한 재실행
-
-// ✅ 올바른 패턴
-const refetch = useCallback(async () => { /* Supabase 요청 */ }, []);
-useEffect(() => { refetch(); }, [refetch]);          // refetch 불변 → 마운트 1회만 실행
-```
-
-**4. 비동기 흐름에서 로딩/성공/실패/빈 상태를 어떻게 표현했는가**
-
-```jsx
-{loading && <Loading message="북마크를 불러오는 중..." />}
-{!loading && error && <ErrorState message="요청에 실패했습니다." onRetry={refetch} />}
-{!loading && !error && <BookmarkList bookmarks={filtered} />}
-// BookmarkList 내부: bookmarks.length === 0 → <EmptyState />
-```
-
-`loading` 여부와 `error` 값, 조회한 데이터의 유무로 네 상태가 겹치지 않게 처리했다.
-
-**5. 라우팅 → 컴포넌트 → 상태 → 이벤트 → 렌더링 연결**
-
-북마크 등록 흐름: "새 북마크" 클릭 → `/bookmarks/new` 매칭 → `ProtectedRoute`에서 세션 확인 → 비로그인이면 로그인 후 원래 경로로 복귀 → `BookmarkNewPage`와 `BookmarkForm` 렌더 → 입력 `onChange` → `values` state 갱신 → 제출 클릭 → `validate()` → `submitting: true` → Supabase `insert` → 성공 시 새 상세 페이지 이동 → 실패 시 폼을 유지하고 `submitError` 표시.
-
----
-
-## 기능 구현
-
-### CRUD 흐름
-
-| 동작 | 진입 경로 | Supabase 쿼리 | 결과 |
-| --- | --- | --- | --- |
-| 목록 조회 | `/bookmarks` | `select("*").order("created_at", {ascending:false})` | 카드 목록 렌더, 카테고리 필터 적용 |
-| 상세 조회 | `/bookmarks/:id` | `select("*").eq("id", id).maybeSingle()` | 제목/URL/메모/등록일 표시 |
-| 등록 | `/bookmarks/new` → 폼 제출 | `insert(payload).select().single()` | 새 레코드 상세 페이지로 이동 |
-| 수정 | `/bookmarks/:id/edit` → 폼 제출 | `update(values).eq("id", id).select("id").maybeSingle()` | 변경된 행 확인 후 해당 상세 페이지로 이동 |
-| 삭제 | `/bookmarks/:id` → 삭제 버튼 | `delete().eq("id", id).select("id").maybeSingle()` | 삭제된 행 확인 후 목록 페이지로 이동 |
-
-등록·수정·삭제는 로그인 세션을 확인한다. 등록 `payload`에는 폼의 `title`, `url`, `memo`, `category`만 선택하고 `user_id`는 확인한 세션 사용자의 ID로 채운다. `user_id`는 작성자 메타데이터이며 소유자만 수정·삭제하도록 제한하는 정책은 아니다. 수정·삭제 결과가 0행이면 성공으로 이동하지 않고 실패를 표시한다. 원격 DB에서도 같은 제한이 적용되려면 아래 복구·권한 SQL을 실제 Supabase 프로젝트에 적용해야 한다.
-
-### CRUD 실패 케이스 처리
-
-| 실패 유형 | 원인 | UI 동작 |
-| --- | --- | --- |
-| 목록·상세 조회 실패 | 네트워크 오류, Supabase 서비스 장애 | `error` state 설정 → `ErrorState` 렌더 ("요청에 실패했습니다.") + 재시도 버튼 |
-| 등록 실패 | 필수 컬럼 누락, RLS 정책 거부 | DB 오류 코드와 누락 컬럼 등 필요한 원인을 안내하고 폼 유지. 원본 행·토큰 등 상세값은 표시하지 않음 |
-| 수정 실패 | 존재하지 않는 id, RLS 정책 거부 | `submitError` state 설정 → 폼 상단 에러 표시, 현재 페이지 유지 |
-| 삭제 실패 | 존재하지 않는 id, 네트워크 오류 | `deleteError` state 설정 → 삭제 버튼 위에 에러 메시지 표시, 페이지 유지 |
-| 존재하지 않는 id 조회 | `.maybeSingle()` 결과 `null` | `!bookmark` 분기 → `ErrorState` ("해당 북마크를 찾을 수 없습니다.") |
-
-모든 실패 케이스에서 페이지를 벗어나지 않고 인라인으로 오류를 표시한다. 재시도는 `refetch()` 직접 호출 또는 폼 재제출로 처리한다.
-
-### 삭제·수정 후 목록 자동갱신 흐름
-
-별도의 갱신 API 호출 없이 라우트 이동으로 자연스럽게 최신 데이터를 불러온다.
-
-| 동작 | 이동 경로 | 갱신 원리 |
-| --- | --- | --- |
-| 삭제 성공 | `/bookmarks/:id` → `/bookmarks` | `BookmarksPage` 재마운트 → `useBookmarks`의 `useEffect` 재실행 → 최신 목록 재조회 |
-| 수정 성공 | `/bookmarks/:id/edit` → `/bookmarks/:id` | `BookmarkDetailPage` 재마운트 → `useBookmark(id)`의 `useEffect` 재실행 → 수정된 단건 재조회 |
-| 에러 재시도 | 동일 페이지 유지 | `ErrorState`의 재시도 버튼 → `refetch()` 직접 호출 → 로딩 상태 초기화 후 재조회 |
-
-### 상태 → 렌더링 변화 포인트
-
-| 상태 변화 | 렌더 결과 |
-| --- | --- |
-| `category` 드롭다운 선택 | `useMemo` 재계산 → 카드 목록 즉시 교체 (재조회 없음) |
-| `loading: true → false` | `<Loading />` 사라지고 데이터/에러/빈 상태 렌더 |
-| `errors.title` 설정 | `Input`에 `invalid` 클래스 + 필드 아래 에러 메시지 |
-| `submitting: false → true` | 버튼 "처리 중..." + `disabled` |
-| `deleteError` 설정 | 삭제 버튼 위에 에러 메시지 |
-| 로그인·로그아웃으로 `user` 변경 | 헤더·프로필·등록/수정/삭제 메뉴와 보호 라우트가 함께 변경 |
-| CRUD 성공 안내 전달·닫기 | 이동한 화면 상단의 성공 메시지를 표시·숨김 |
-
----
-
-## 접근성(aria/role) 정책
-
-공통 상태 컴포넌트에 ARIA 속성을 일관되게 적용했다.
-
-| 컴포넌트 | ARIA 속성 | 의도 |
-| --- | --- | --- |
-| `Loading` | `role="status"` | 스크린 리더에 "로딩 중" 상태 알림 |
-| `Loading` > spinner | `aria-hidden="true"` | CSS 스피너는 시각적 장식 요소 — 스크린 리더에서 숨김 |
-| `ErrorState` | `role="alert"` | 스크린 리더에 즉시 오류 내용을 읽어줌 (assertive live region) |
-| `BookmarkDetailPage` > 외부 링크 | `rel="noreferrer"` | 링크 대상이 `window.opener`에 접근하지 못하도록 보안 처리 |
-
-`EmptyState`는 별도 ARIA role을 부여하지 않았다 — 빈 상태는 오류나 경고가 아니어서 사용자 주의를 즉시 끌 필요가 없기 때문이다.
-
----
-
-## 폼 검증 정책
-
-| 필드 | 검증 규칙 | 설명 |
-| --- | --- | --- |
-| `title` | 빈 문자열 불가 (`trim()`) | 필수 식별 정보 |
-| `url` | 빈 문자열 불가 (`trim()`) | 핵심 데이터로 필수 |
-| `url` 형식 | `new URL()`로 파싱 가능한 절대 주소이며 `http:` 또는 `https:`만 허용 | `http://localhost` 같은 주소도 허용 |
-| `memo` | 미검증 | 선택 입력 필드 |
-| `category` | 미검증 | `<select>`로 상수 목록 내에서만 선택 가능 — 잘못된 값이 입력될 수 없음 |
-
-에러 메시지는 제출 시 한 번에 표시하고, 해당 필드를 다시 입력하기 시작하는 순간 지워진다 (`handleChange` 내 에러 클리어).
-
-URL 검증은 `lib/bookmarkUrl.js`에서 공통 처리한다. 이전에 저장된 비HTTP/HTTPS 주소는 상세 화면에 텍스트로 표시하고 외부 링크로 열지 않는다.
-
----
-
-## Supabase 선택 이유 및 연동 경험
-
-**선택 이유**: PostgreSQL 기반이라 `schema.sql` 한 파일로 스키마·RLS 정책을 버전 관리할 수 있고, SDK 메서드 체이닝이 SQL과 1:1 대응되어 읽기 쉽다. Firebase(NoSQL)보다 단일 테이블 CRUD에 구조가 명확했다.
-
-**연동 중 겪은 어려움**: `useEffect` + `useCallback` 의존성 배열 설정 실수로 무한 루프 발생. `refetch`를 `useCallback` 없이 의존성에 넣으면 렌더마다 새 함수 참조가 생겨 effect가 계속 재실행된다. `useCallback([])` / `useCallback([id])`로 메모이제이션해 해결했다.
-
-**인증과 권한**: 선택 과제인 Supabase Auth와 사용자 Context를 추가했다. 목표 정책은 공개 조회·로그인 사용자 등록/수정/삭제다. `ProtectedRoute`가 등록·수정·프로필 경로를 보호하고, 페이지의 쓰기 처리와 DB의 RLS 정책이 각각 세션과 데이터 권한을 확인한다. 등록 시 `user_id`에 작성자 ID를 기록하지만, 작성자별 소유권 제한은 두지 않아 로그인 사용자는 모든 북마크를 수정·삭제할 수 있다. 이 정책은 SQL을 실제 DB에 적용해야 반영된다.
-
-**연동 중 겪은 주요 에러와 해결:**
-
-| 에러 | 원인 | 해결 |
-| --- | --- | --- |
-| `useEffect` 무한 루프 | `refetch`를 `useCallback` 없이 의존성에 넣어 렌더마다 새 참조 생성 | `useCallback([])` / `useCallback([id])`로 메모이제이션 |
-| `.single()` 에러 | 없는 id 조회 시 단건이 아니라는 에러 발생 | `.maybeSingle()`로 교체 — 없으면 `null` 반환 |
-| 환경변수 누락으로 앱 흰 화면 | 이전 구현은 `.env` 없이 실행 시 모듈 초기화에서 예외 발생 | 현재는 설정 안내 화면을 표시하고 `.env.example`과 배포 환경변수 등록으로 안내 |
-| 원격 조회 `42703`: `column bookmarks.memo does not exist` | 기존 테이블에 `memo`가 없었다. `CREATE TABLE IF NOT EXISTS`는 이미 있는 테이블에 컬럼을 추가하지 않으며 `category`·`user_id`만 추가해도 앱 계약이 완성되지 않음 | 읽기 전용 진단 SQL로 구조를 확인한 뒤 갱신한 `schema.sql` 전체 실행. 앱은 확인한 작성자 ID를 등록 payload에 포함하고 DB 오류 원인을 안내 |
-
-상세 내용(RLS 정책, useEffect 패턴, 버전) → [docs/tech.md](./docs/tech.md)
-
----
-
-## 개발 환경
-
-| 항목 | 내용 |
-| --- | --- |
-| 언어 | JavaScript (ES2020+), JSX |
-| 프레임워크 | React 19 + React Router 7 |
-| 빌드 도구 | Vite 8 |
-| 백엔드 | Supabase (Postgres + PostgREST, `bookmarks` 테이블) |
-| 배포 | Vercel |
-
-버전 상세, DB 스키마, 환경변수, useEffect 패턴 → [docs/tech.md](./docs/tech.md)
-
----
-
-## 폴더 구조
-
-```
-src/
-├── App.jsx                  # 라우트 트리 루트
-├── main.jsx                 # BrowserRouter + AuthProvider 진입점
-├── context/
-│   └── AuthContext.jsx      # 로그인 사용자·초기 세션·인증 이벤트 공유
-├── lib/
-│   ├── supabase.js          # Supabase 클라이언트 싱글턴
-│   ├── constants.js         # 카테고리 상수
-│   ├── authRedirect.js      # 로그인 복귀 경로·가입 메일 주소 검증
-│   ├── bookmarkUrl.js       # HTTP/HTTPS URL 검증
-│   └── bookmarkErrors.js    # DB 오류 코드·알려진 컬럼만 안내
-├── hooks/
-│   ├── useBookmarks.js      # 목록 조회 (loading/error/refetch)
-│   ├── useBookmark.js       # 단건 조회 (loading/error/refetch)
-│   └── useAuth.js           # AuthContext 사용
-├── pages/                   # 라우트 단위 화면
-│   ├── HomePage.jsx
-│   ├── BookmarksPage.jsx    # 목록 + 카테고리 필터
-│   ├── BookmarkDetailPage.jsx
-│   ├── BookmarkNewPage.jsx
-│   ├── BookmarkEditPage.jsx
-│   ├── NotFoundPage.jsx
-│   ├── LoginPage.jsx         # 이메일 로그인·회원가입
-│   └── ProfilePage.jsx       # 사용자 정보·로그아웃
-└── components/              # 공용 UI와 보호 라우트
-    ├── Layout.jsx
-    ├── Button.jsx / Input.jsx / Textarea.jsx / Select.jsx / Card.jsx
-    ├── Loading.jsx / ErrorState.jsx / EmptyState.jsx
-    ├── CategoryFilter.jsx / ProtectedRoute.jsx
-    ├── SetupNotice.jsx      # Supabase 환경변수 누락 안내
-    └── BookmarkCard.jsx / BookmarkList.jsx / BookmarkForm.jsx
-```
-
-### 파일 작성 규칙
-
-| 대상 | 네이밍 | 예시 |
-| --- | --- | --- |
-| 페이지·UI 컴포넌트 | `PascalCase.jsx` | `BookmarkCard.jsx` |
-| 커스텀 훅 | `camelCase.js` (`use` 접두어 필수) | `useBookmarks.js` |
-| 유틸·클라이언트 | `camelCase.js` | `supabase.js`, `constants.js` |
-| UI·훅은 named export | `export function Foo()` | 앱 루트 `App.jsx`는 default export |
-
----
-
-## 라우트 (8개)
-
-| 경로 | 화면 |
-| --- | --- |
-| `/` | 홈 |
-| `/bookmarks` | 북마크 목록 (카테고리 필터) |
-| `/bookmarks/new` | 북마크 등록 (로그인 필요) |
-| `/bookmarks/:id` | 북마크 상세 |
-| `/bookmarks/:id/edit` | 북마크 수정 (로그인 필요) |
-| `/login` | 이메일 로그인·회원가입 |
-| `/profile` | 사용자 정보·로그아웃 (로그인 필요) |
-| `*` | Not Found |
-
-### 네비게이션 링크 구조
-
-`Layout.jsx`의 헤더에 홈·북마크 목록 링크를 제공하고, 로그인 상태에 따라 등록·로그인·프로필 메뉴를 표시한다. 현재 경로와 일치하는 링크에는 `active` 클래스가 자동으로 붙는다.
-
-| 링크 | 경로 | `end` 옵션 |
-| --- | --- | --- |
-| 홈 | `/` | `true` — `/bookmarks` 등 하위 경로에서 active 방지 |
-| 북마크 목록 | `/bookmarks` | — |
-| 새 북마크 (로그인 사용자) | `/bookmarks/new` | — |
-| 로그인 (비로그인 사용자) | `/login` | — |
-| 내 프로필 (로그인 사용자) | `/profile` | — |
-
-`end={true}` 없이 `/`를 NavLink로 사용하면 모든 경로에서 항상 active 상태가 된다. `end` 옵션으로 경로가 정확히 `/`일 때만 활성화되도록 처리했다.
-
----
-
-## 컴포넌트 설계 기준
-
-페이지 컴포넌트(`pages/`)와 UI 컴포넌트(`components/`)를 아래 기준으로 분리했다.
-
-- **페이지 컴포넌트**: 라우트 하나에 대응하는 최상위 화면. 데이터 조회·CRUD 요청, 라우팅(navigate) 등 "무엇을 할 것인가"를 담당한다.
-- **UI 컴포넌트**: 버튼·입력·카드·상태 표시 등 재사용할 화면 조각을 담당한다. 기본 입력 UI는 props로 제어하고, `Layout`·링크 카드·`ProtectedRoute`는 라우팅이나 사용자 Context도 사용한다.
-
-### 컴포넌트 추출 기준
-
-두 가지 규칙 중 하나라도 해당하면 컴포넌트로 추출했다.
-
-1. **반복 패턴**: 동일한 UI 구조가 2곳 이상에 등장할 때
-   - `Loading`, `ErrorState`, `EmptyState` — 목록·상세·수정 3개 페이지에서 동일하게 사용
-   - `BookmarkForm` — 등록(`BookmarkNewPage`)과 수정(`BookmarkEditPage`)이 같은 필드 구성
-2. **단일 책임**: 하나의 역할만 갖도록 경계를 그을 수 있을 때
-   - `Button` — 클릭 요소의 스타일·상태만 담당 (내용·클릭 동작은 모름)
-   - `BookmarkCard` — 카드 한 장 렌더만 담당 (목록·데이터 소스는 모름)
-   - `BookmarkList` — 배열을 받아 카드를 나열하거나 EmptyState를 보여주는 역할만
-
-기존 재사용 UI 13개와 추가한 보호 라우트:
-
-| 컴포넌트 | 역할 | 사용 위치 |
-| --- | --- | --- |
-| `Layout` | 헤더·네비게이션 공통 레이아웃 | `App.jsx` (전 페이지 공통) |
-| `Button` | variant/loading/disabled 버튼 | `BookmarkForm`, `BookmarkDetailPage`, `ErrorState` |
-| `Input` | 텍스트 입력 + 에러 메시지 | `BookmarkForm` |
-| `Textarea` | 여러 줄 입력 + 에러 메시지 | `BookmarkForm` |
-| `Select` | 드롭다운 선택 | `BookmarkForm`, `CategoryFilter` |
-| `Card` | 흰 카드 컨테이너 | `BookmarkCard` |
-| `Loading` | 로딩 스피너 | `BookmarksPage`, `BookmarkDetailPage`, `BookmarkEditPage` |
-| `ErrorState` | 에러 메시지 + 재시도 버튼 | `BookmarksPage`, `BookmarkDetailPage`, `BookmarkEditPage` |
-| `EmptyState` | 데이터 없음 안내 | `BookmarkList` |
-| `CategoryFilter` | 카테고리 드롭다운 필터 | `BookmarksPage` |
-| `BookmarkCard` | 북마크 카드 한 장 | `BookmarkList` |
-| `BookmarkList` | 카드 목록 (EmptyState 포함) | `BookmarksPage` |
-| `BookmarkForm` | 등록/수정 공용 폼 | `BookmarkNewPage`, `BookmarkEditPage` |
-| `ProtectedRoute` | 세션 확인·비로그인 사용자 로그인 이동 | 등록·수정·프로필 라우트 |
-
----
-
-## 커스텀 훅
-
-### 분리한 이유
-
-조회하는 컴포넌트마다 Supabase 호출을 작성하면 같은 `useState` + `useEffect` 패턴이 중복된다. 조회 훅으로 분리하면 세 가지 이점이 생긴다. 등록·수정·삭제 요청은 각 페이지에서 직접 처리한다.
-
-1. **재사용**: `useBookmark(id)`는 `BookmarkDetailPage`와 `BookmarkEditPage` 두 곳에서 동일하게 쓴다.
-2. **관심사 분리**: 페이지 컴포넌트는 "어떻게 가져오는가"를 몰라도 된다. `loading`, `error`, `data`, `refetch`만 받아 화면에 집중한다.
-3. **외부 호출**: `refetch`를 훅 밖에서 호출할 수 있어 삭제 후 목록 갱신, 에러 재시도에서 직접 사용한다.
-
-### `useBookmarks()` — 목록 조회
-
-```js
-const { bookmarks, loading, error, refetch } = useBookmarks();
-```
-
-마운트 시 1회 Supabase에서 전체 북마크를 `created_at` 내림차순으로 가져온다. `refetch`는 `useCallback`으로 메모이제이션해 `useEffect` 무한 루프를 방지한다.
-
-- 사용처: `BookmarksPage` (1곳)
-- 재조회 트리거: 삭제 후 목록 페이지 재마운트, 에러 시 재시도 버튼
-
-### `useBookmark(id)` — 단건 조회
-
-```js
-const { bookmark, loading, error, refetch } = useBookmark(id);
-```
-
-URL 파라미터 `id`가 바뀌면 자동으로 재조회한다 (`useCallback([id])` → `useEffect([refetch])`). `.maybeSingle()`로 결과 없을 때 에러 대신 `null`을 반환해 "찾을 수 없습니다" 화면을 별도 처리한다.
-
-- 사용처: `BookmarkDetailPage`, `BookmarkEditPage` (2곳)
-- 재조회 트리거: id 변경, 에러 시 재시도 버튼
-
-**의존성 변화 시 예상 동작:**
-
-| 상황 | 동작 |
-| --- | --- |
-| 같은 id로 재렌더 | `refetch` 참조 유지 → `useEffect` 재실행 안 함 |
-| 다른 id로 이동 | `useCallback([id])`가 새 함수 생성 → `refetch` 참조 변경 → `useEffect` 재실행 → 새 id로 재조회 |
-| 에러 후 재시도 | `ErrorState`의 `onRetry` → `refetch()` 직접 호출 → `loading` 초기화 후 재조회 |
 
 ---
 
@@ -611,6 +471,9 @@ user_id uuid default auth.uid()
 
 컬럼이 이미 맞고 권한만 전환할 때의 예시는 다음과 같다. 기존 허용 정책은 OR로 합쳐질 수 있으므로 정책을 추가하기만 하지 않고 `public.bookmarks`의 기존 정책을 보관한 뒤 전환한다. 이 블록은 해당 테이블의 정책을 모두 교체하며, 전체 `schema.sql`을 실행했다면 다시 실행할 필요가 없다.
 
+<details>
+<summary>컬럼 구성이 정상일 때 사용하는 공유 권한 SQL</summary>
+
 ```sql
 begin;
 
@@ -654,6 +517,8 @@ to authenticated using (auth.uid() is not null);
 commit;
 ```
 
+</details>
+
 정책 4행이 존재한다는 것만으로 완료는 아니다. 역할·명령·조건과 스키마/테이블 권한을 확인하고, 실제 로그인 세션으로 등록·조회·수정·삭제한 행을 확인한다. 이 프로젝트에서는 등록·조회는 성공해도 수정·삭제가 HTTP 200과 반환 0행이었던 적이 있다. 전체 SQL 적용 후 실제 반환 행까지 확인해 CRUD를 검증했다.
 
 <details>
@@ -676,7 +541,7 @@ commit;
 
 ### 4. 배포 전후 체크리스트
 
-다른 환경을 구성할 때 순서대로 확인하는 목록이다. 현재 배포의 실제 검사 결과는 아래 [현재 배포 확인 범위](#현재-배포-확인-범위)에 기록했다.
+다른 환경을 구성할 때 사용하는 **빈 체크리스트 템플릿**이다. 문서·발표자료 검수 완료 기록은 [최종 체크리스트](./docs/b1_2_presentation_checklist.md)에 있다. 현재 배포의 실제 검사 결과는 아래 [현재 배포 확인 범위](#현재-배포-확인-범위)에 기록했다.
 
 - [ ] 사용할 Supabase 프로젝트의 URL과 공개 키를 같은 프로젝트에서 가져왔다.
 - [ ] 필요한 Vercel 환경에만 값을 설정하고 변경 후 다시 배포했다. 서비스 역할 키·계정 비밀번호를 `VITE_` 변수에 넣지 않았다.
@@ -692,176 +557,38 @@ commit;
 
 ---
 
-## 로컬 실행 방법
-
-Node.js 26에서 설치·빌드·테스트를 검증했다. 테스트 도구의 지원 버전은 Node.js 22.22.2 이상(22.x), 24.15.0 이상(24.x), 또는 26 이상이다.
-
-```bash
-npm install
-cp .env.example .env   # Supabase 프로젝트의 URL/anon key로 채운다
-npm run dev
-```
-
-Windows PowerShell에서는 `Copy-Item .env.example .env`로 복사할 수 있다. 실행 정책으로 `npm.ps1`이 막히면 동일한 명령을 `npm.cmd install`, `npm.cmd run dev`로 실행한다.
-
-환경변수는 다음과 같다. `VITE_` 변수는 브라우저 번들에 포함되므로 공개 키만 사용하며 서비스 역할 키는 넣지 않는다.
-
-```dotenv
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-project-public-key
-# 선택: 가입 확인 메일의 복귀 주소. 미설정이면 현재 브라우저의 origin 사용
-VITE_APP_URL=http://localhost:5173
-```
-
-Supabase 테이블은 다음 순서로 준비한다. 이번 환경은 사용자가 전체 `schema.sql`을 실행해 누락 컬럼·기본값·공유 쓰기 권한을 보완했고, 이후 평가 계정의 API 로그인·등록·조회·수정·삭제를 모두 확인했다. 다음 절차는 새 환경이나 기존 테이블을 같은 계약에 맞출 때 사용한다.
-
-1. SQL Editor에서 [supabase/diagnose-bookmarks.sql](./supabase/diagnose-bookmarks.sql)을 실행해 현재 컬럼·기본값·정책·테이블 권한 결과를 보관한다. 이 파일은 읽기 전용이다.
-2. 신규 환경을 만들거나 기본값·공유 쓰기 권한까지 이 앱의 계약에 맞출 때는 [schema.sql](./schema.sql) 전체를 한 번 실행한다. 새 테이블 생성뿐 아니라 기존 테이블의 누락된 `memo`, `category`, `user_id`, `created_at`과 기본값을 보완하고, 공개 조회·로그인 사용자 쓰기 정책 및 API 스키마 새로고침까지 적용한다.
-3. 진단 SQL을 다시 실행해 필요한 컬럼·기본값·정책 4개를 확인한 뒤 앱에서 등록·조회·수정·삭제를 재검증한다.
-
-`schema.sql` 전체에는 권한 전환이 포함되어 있어 [policies-authenticated-writes.sql](./supabase/policies-authenticated-writes.sql)을 추가로 실행할 필요가 없다. 이 별도 파일은 컬럼이 이미 맞고 권한만 전환할 때 사용할 수 있다. 기존 컬럼의 타입·NOT NULL 제약·저장값은 임의로 변경하지 않으며, 기존 작성자 ID도 덮어쓰지 않는다. SQL 파일을 저장한 것만으로 원격 DB가 바뀌지는 않는다. 전체 기본값·권한 보완을 적용하려면 사용자가 SQL Editor에서 실행한다.
-
-가입 확인 메일의 복귀 주소는 `VITE_APP_URL` 또는 현재 origin에 `/login?redirect=...`를 붙여 만든다. `VITE_APP_URL`을 사용한다면 이 앱의 주소로 설정한다. 기존 B1-2와 Supabase 프로젝트를 공유할 때는 **Authentication → URL Configuration**의 기존 Site URL·허용 주소를 유지하고, Redirect URLs에 `https://b1-2-simple.vercel.app/**`를 추가한다. 로컬 인증도 사용할 때는 `http://localhost:5173/**`를 별도로 허용한다. 현재 공개 인증 설정은 이메일 로그인·회원가입이 가능하고 이메일 확인이 필요한 상태다. 실제 새 확인 메일의 링크가 이 앱으로 돌아오는지 추가로 확인해야 한다.
-
-새로 배포할 때는 Vercel에도 같은 공개 환경변수를 등록하고 다시 빌드한다. 현재 저장소에는 실제 `.env` 값이 포함되어 있지 않다. 이번 환경은 사용자 SQL 적용과 평가 계정의 원격 API 로그인·CRUD 검증을 완료했으며, 브라우저에서의 전체 UI 조작과 신규 가입 확인 메일 복귀는 별도로 확인한다.
-
-### 검사 명령
-
-```bash
-npm run lint
-npm test
-npm run build
-```
-
-자동 테스트는 Supabase 응답을 대체해 인증 상태·보호 라우트·오류 처리를 확인한다. 실제 이메일 수신과 원격 RLS·배포 CRUD 확인은 별도로 필요하다.
-
-2026-11-10 로컬 검증: `npm run build`, `npm run lint`, `npm test` 모두 통과했다. 테스트는 8개 파일의 62개 항목이며 인증·권한·URL 검증·조회 응답 경합과 누락 컬럼 오류·작성자 ID 전달·안전한 오류 안내를 포함한다. 갱신한 잠금 파일은 `npm ci --dry-run --offline`으로 일관성을 확인했다.
+## 검증 결과
 
 ### 현재 배포 확인 범위
 
-현재 배포 주소는 https://b1-2-simple.vercel.app 이다. 2026-11-10에 확인한 범위는 다음과 같다.
+2026-11-10에 확인한 기록이다. 현재 주소는 [b1-2-simple.vercel.app](https://b1-2-simple.vercel.app)이며, 구현·자동 테스트·실제 API·정적 캡처의 증거 범위를 구분한다.
 
-| 확인 대상 | 결과와 의미 |
-| --- | --- |
-| 사용자 제공 홈 화면 | Bookmark Keeper 홈·로그인 메뉴·공개 조회/로그인 쓰기 안내 확인 |
-| 사용자 제공 회원가입·로그인 화면 | 회원가입 입력과 가입 요청 후 이메일 확인 안내 화면 확인 |
-| 홈과 배포 JavaScript | HTTP 200 응답 확인 |
-| 등록 오류 수정 코드 배포 | 커밋 `18f603e`의 Vercel 완료 상태와 실제 프로덕션 JavaScript의 새 오류 안내 코드 반영 확인 |
-| `/bookmarks`, `/login`, `/bookmarks/new`, `/profile`, `/not-a-real-page` | HTTP 200과 React 앱 HTML 응답 확인. SPA rewrite의 HTTP 응답 확인이며, 각 화면의 렌더링·로그인 차단을 브라우저에서 검증한 것은 아님 |
-| Supabase `GET /rest/v1/bookmarks?select=id&limit=0` | 이전 검사에서 HTTP 200. `id` 읽기 API 접근성만 확인하며 앱 전체 컬럼·등록 정상 여부를 검증한 결과가 아님 |
-| 앱 사용 컬럼의 추가 API 검사 | 처음에는 `42703`: `column bookmarks.memo does not exist`. 사용자가 `memo` 추가·API 스키마 새로고침 후 `id,title,url,memo,category,user_id,created_at` 전체 및 개별 컬럼 조회 HTTP 200 확인 |
-| Supabase `GET /auth/v1/settings` | HTTP 200. 이메일 인증 활성화, 회원가입 허용, 이메일 확인 필요 설정 확인 |
-| 평가 계정의 API 로그인·등록·단건 조회 | 로그인 성공. 세션 사용자의 `user_id`를 포함한 임시 북마크 생성 HTTP 201·단건 조회 HTTP 200 확인 |
-| 전체 SQL 적용 후 원격 API CRUD | 사용자의 `schema.sql` 전체 실행 후 새 임시 북마크 등록 HTTP 201·조회 HTTP 200·수정 HTTP 200·삭제 HTTP 200과 실제 반환 행 확인 |
+| 구분 | 확인한 결과 | 범위 |
+| --- | --- | --- |
+| 로컬 검사 | build·lint 통과, 8개 파일의 62개 테스트 통과 | Supabase 응답을 대체한 인증·보호 경로·폼·URL·오류·조회 경합 검사 포함 |
+| 배포 반영 | 등록 오류 안내 코드와 로그인 탭 스타일의 Vercel 반영 확인 | 실제 배포 JavaScript·CSS 확인 |
+| SPA 직접 접근 | 홈과 주요 경로가 HTTP 200 및 앱 HTML 반환 | 전체 화면 조작·로그인 차단 검증을 뜻하지 않음 |
+| 테이블 복구 | memo 누락 42703을 확인하고 사용자 SQL 적용 후 7개 사용 컬럼 조회 성공 | 진단 후 schema.sql 적용 |
+| 원격 API | 평가 계정 로그인, 임시 북마크 생성 201·조회 200·수정 200·삭제 200 | 수정·삭제는 실제 반환 행까지 확인, 검사 행·세션 정리 완료 |
+| 사용자 캡처 | 홈·회원가입·로그인 안내·목록·등록·상세·프로필 7장 | 촬영 시점의 정적 화면 근거 |
+| 발표자료 | 미션 18장·평가 19장, PDF 페이지 수 동일 | 484개 문단 일치, 한글 글꼴 포함, 37장 개별 시각 검수와 수정본 검수 |
 
-원격 `memo` 누락과 수정·삭제 반환 0행 문제는 사용자 SQL 적용 후 해소되었다. 이전 검사에서 남았던 임시 북마크와 새 CRUD 검사 행을 모두 삭제했고, API 검증용 로그인 세션도 정리했다. 실제 사용자 식별값·토큰·공개 연결값은 문서에 기록하지 않았다. 위 API 검증은 브라우저에서의 전체 UI 사용 흐름이나 신규 가입 확인 메일의 수신·복귀를 검증한 결과는 아니다.
+**추가 확인 대상:** 배포 사이트의 전체 브라우저 사용 흐름, 신규 가입 확인 메일의 실제 수신·복귀. 현재 앱 로그아웃은 기본 global 범위이며 다른 앱과 독립적인 local 범위로 바꾸지는 않았다. 공유 인증 설정 변경 시에는 두 앱의 복귀 주소를 함께 확인한다.
 
-### `useAuth()` — 사용자 상태 공유
-
-`AuthProvider`는 시작할 때 `getSession()`으로 세션을 확인하고 `onAuthStateChange()`로 로그인·로그아웃·세션 갱신을 반영한다. `useAuth()`는 `user`, `loading`, `sessionError`, `signIn`, `signUp`, `signOut`을 제공한다. 초기 세션 확인 중에는 보호 화면을 바로 노출하지 않으며, 확인 실패는 오류 UI로 표시한다.
-
-로그인 성공 후에는 `redirect` 쿼리에 담긴 내부 경로로 복귀한다. `authRedirect.js`가 외부 주소·잘못된 인코딩·로그인 화면으로 돌아가는 경로를 걸러낸다. 회원가입 후 세션이 바로 생기지 않으면 확인 메일 안내를 표시하며, 프로필에서 표시 이름·이메일·가입일을 확인하고 로그아웃할 수 있다.
-
-### 과거 실행 결과 (인증 추가 전)
-
-```
-$ npm install
-
-added 312 packages in 8s
-
-$ npm run dev
-
-  VITE v8.1.1  ready in 342 ms
-
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: use --host to expose
-  ➜  press h + enter to show help
-```
+검증 계정의 개인 이메일과 토큰은 문서에 기록하지 않는다. 평가용 비밀번호·마스킹된 이메일 안내는 [회원가입·로그인 화면과 평가용 계정](#evaluation-account)에 있다. 문서·발표자료의 순서별 점검과 GitHub 반영 기록은 [최종 체크리스트](./docs/b1_2_presentation_checklist.md)를 참고한다.
 
 ### 과거 배포 CRUD 확인 기록 (인증 추가 전)
 
-이전 문서에는 배포 URL(https://codyssey-b1-2.vercel.app)에서 아래 시나리오를 확인한 기록이 있다. 인증 추가 후에는 쓰기 작업 전에 로그인해야 하며, 이 기록으로 현재 버전의 배포 상태를 보증하지 않는다.
+이전 주소 `https://codyssey-b1-2.vercel.app`와 인증 추가 전 실행·CRUD·빌드 로그는 [과거 검증 기록](./docs/verification-history.md)에 보존했다. 현재 배포 상태는 위 표를 기준으로 판단한다.
 
-**시나리오 1 — 등록 (Create)**
-```
-1. /bookmarks/new 접속
-2. 제목·URL 미입력 상태로 "등록" 클릭
-   → "제목을 입력하세요.", "URL을 입력하세요." 인라인 에러 표시 ✓
-3. 제목: "React 공식 문서", URL: "https://react.dev", 카테고리: "개발" 입력 후 등록
-   → 버튼 "처리 중..." 비활성화 ✓
-   → 성공 후 /bookmarks/{새id} 상세 페이지 자동 이동 ✓
-```
+## 문서 모음
 
-**시나리오 2 — 목록 조회 & 필터 (Read)**
-```
-1. /bookmarks 접속
-   → 로딩 스피너 표시 후 카드 목록 렌더 ✓
-2. 카테고리 드롭다운 "개발" 선택
-   → 페이지 새로고침 없이 개발 카테고리 카드만 표시 ✓
-3. "전체 카테고리" 선택 → 전체 목록 복원 ✓
-```
-
-**시나리오 3 — 수정 (Update)**
-```
-1. 카드 클릭 → /bookmarks/:id 상세 이동
-2. "수정" 버튼 → /bookmarks/:id/edit 이동
-   → 폼에 기존 값(제목·URL·메모·카테고리) 초기화 확인 ✓
-3. 제목 수정 후 "수정 완료" 클릭
-   → /bookmarks/:id 상세 페이지로 이동, 수정된 제목 표시 ✓
-```
-
-**시나리오 4 — 삭제 (Delete)**
-```
-1. 상세 페이지 "삭제" 버튼 클릭
-   → 버튼 "처리 중..." 비활성화 ✓
-   → 성공 후 /bookmarks 목록 이동 ✓
-   → 삭제된 항목 목록에서 미노출 ✓
-```
-
-**시나리오 5 — 에러 & 엣지 케이스**
-```
-1. 존재하지 않는 경로(/abcdef) 접속 → 404 NotFoundPage 표시 ✓
-2. /bookmarks/new 브라우저 직접 입력 → SPA rewrite로 정상 렌더 ✓
-3. 목록이 빈 상태 → "표시할 데이터가 없습니다." EmptyState 표시 ✓
-```
-
-| 시나리오 | 결과 |
+| 목적 | 자료 |
 | --- | --- |
-| Create — 유효성 검증 + 등록 후 이동 | ✅ |
-| Read — 목록 조회 + 카테고리 필터 | ✅ |
-| Update — 기존 값 초기화 + 수정 후 이동 | ✅ |
-| Delete — 삭제 후 목록 이동 + 미노출 | ✅ |
-| Not Found, 직접 URL 접근, Empty 상태 | ✅ |
-
-### 과거 빌드 결과 (인증 추가 전)
-
-```
-$ npm run build
-
-vite v8.1.1 building for production...
-✓ 87 modules transformed.
-dist/index.html                   0.46 kB │ gzip:  0.30 kB
-dist/assets/index-BkR3qX2m.css   6.12 kB │ gzip:  2.01 kB
-dist/assets/index-Dv9K7Lem.js  189.34 kB │ gzip: 61.48 kB
-✓ built in 1.24s
-```
-
----
-
-## 이번에 추가한 UX
-
-기존 개선 계획에 남아 있던 다음 기능도 구현했다.
-
-- **빈 목록의 다음 행동**: 북마크가 없으면 새 북마크 등록으로 연결한다. 비로그인 사용자는 인증 후 등록한다. 카테고리 필터에만 결과가 없으면 전체 카테고리로 되돌릴 수 있다.
-- **저장·삭제 성공 안내**: 등록·수정·삭제 성공 후 이동한 화면 상단에 `role="status"` 메시지를 표시한다. 자동으로 사라지는 토스트 대신 사용자가 닫을 수 있는 안내를 사용한다. `Layout`에서 라우트의 `state.notice`를 표시하므로 알림 전용 Context는 추가하지 않았다.
-- **URL 형식 검증**: `bookmarkUrl.js`로 HTTP/HTTPS 절대 주소를 검증한다. 기존 데이터의 위험한 프로토콜 주소도 상세 화면에서 링크로 열지 않는다.
-
----
-
-## 보너스 과제
-
-| 항목 | 구현 여부 | 내용 |
-| --- | --- | --- |
-| 전역 상태 | ✓ | `AuthContext`에서 로그인 사용자·세션 확인 상태를 공유하고 `useAuth`로 사용 |
-| 성능 최적화 (`useMemo` / `useCallback`) | ✓ | `BookmarksPage`에서 카테고리 필터 결과를 `useMemo`로 계산 — `bookmarks` 또는 `category`가 바뀔 때만 재계산. 두 커스텀 훅에서 `useCallback`으로 `refetch`를 메모이제이션해 `useEffect` 무한 루프 방지 |
-| 인증 | ✓ | Supabase Auth 로그인·회원가입·로그아웃, 등록·수정·프로필 보호 라우트, 로그인 후 내부 경로 복귀 |
+| 미션 요구사항과 답변 | [미션 원문](./docs/b1_2_mission.md), [미션 QA](./docs/b1_2_mission_QA.md) |
+| 평가 준비 | [평가 원문](./docs/b1_2_evaluation_questions.md), [평가 QA](./docs/b1_2_evaluation_questions_QA.md) |
+| React·도구 설명 | [기술 문서](./docs/tech.md) |
+| 두 구현 비교 | [B1-2와 simple 비교](./docs/comparison-b1-2-simple.md) — 비교 본문은 과거 시점이며 현재 인증 구현은 부록·코드와 함께 확인 |
+| 발표 파일 검수 | [최종 체크리스트](./docs/b1_2_presentation_checklist.md) |
+| DB 진단·복구 | [읽기 전용 진단](./supabase/diagnose-bookmarks.sql), [전체 schema.sql](./schema.sql), [권한 전환만 적용](./supabase/policies-authenticated-writes.sql) |
+| 이전 실행 기록 | [인증 추가 전 기록](./docs/verification-history.md) |
