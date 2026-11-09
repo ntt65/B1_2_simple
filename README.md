@@ -397,6 +397,32 @@ URL 파라미터 `id`가 바뀌면 자동으로 재조회한다 (`useCallback([i
 
 이 가이드는 현재 Bookmark Keeper의 **공개 조회 + 로그인 사용자 전체 쓰기** 구조를 기준으로 한다. `user_id`는 작성자 기록이며, 로그인 사용자는 다른 사용자가 등록한 북마크도 수정·삭제할 수 있다. SQL의 기준 파일은 [schema.sql](./schema.sql)이고, 기존 환경의 구조를 읽는 파일은 [diagnose-bookmarks.sql](./supabase/diagnose-bookmarks.sql)이다.
 
+### 현재 운영 구조: Vercel 2개와 Supabase 1개
+
+2026-11-10에 두 배포본의 Supabase 프로젝트 주소와 저장소 코드를 대조했다. 두 Vercel 앱은 같은 Supabase 프로젝트를 사용하지만 **서로 다른 테이블에 저장한다.** Supabase 프로젝트 하나 안에는 여러 테이블을 둘 수 있으므로 현재 구성을 유지한다.
+
+| 앱·Vercel 주소 | 사용하는 테이블 | 코드 근거 |
+| --- | --- | --- |
+| `B1-2` · [b1-2-puce.vercel.app](https://b1-2-puce.vercel.app) | `public.items` — 학습 아이템 | [B1-2의 테이블 지정](https://github.com/ntt65/B1-2/blob/main/src/lib/api.js#L9) |
+| `B1_2_simple` · [b1-2-simple.vercel.app](https://b1-2-simple.vercel.app) | `public.bookmarks` — 북마크 | [simple의 목록 조회](./src/hooks/useBookmarks.js), [등록](./src/pages/BookmarkNewPage.jsx) |
+
+두 앱이 모두 `bookmarks`를 사용한다는 가정은 실제 코드와 다르다. 현재 각 앱의 CRUD는 자기 테이블을 대상으로 하므로, 같은 Supabase 주소를 쓴다는 이유로 두 앱의 데이터가 자동으로 섞이지 않는다. simple의 SQL도 `public.bookmarks`를 대상으로 하며 기존 정책을 제거하는 구문은 `schemaname = 'public' AND tablename = 'bookmarks'`로 제한되어 `items`의 컬럼·정책을 직접 변경하지 않는다.
+
+앞서 발생한 등록 오류는 `bookmarks.memo` 누락(`42703`)이었고, 수정·삭제의 반환 0행 문제는 해당 테이블의 권한·정책을 맞춰 해결했다. 전체 [schema.sql](./schema.sql) 적용 후 실제 로그인 세션으로 CRUD 반환 행까지 확인한 기록은 [현재 배포 확인 범위](#현재-배포-확인-범위)에 있다.
+
+**운영 원칙과 향후 확장**
+
+- 현재 `items`와 `bookmarks`를 유지한다. 이 구성을 위해 `app_id`를 추가하거나 기존 테이블 이름을 바꾸고 데이터를 이관할 필요는 없다.
+- 향후 `b2_1`은 예를 들어 `public.b2_1_items`처럼 전용 테이블을 만든다. 이 이름은 향후 예시이며 아직 생성한 테이블이 아니다. 각 리포지토리의 SQL은 자기 테이블의 컬럼·권한·정책만 관리한다.
+- `app_id`는 여러 앱이 같은 종류의 데이터를 한 테이블에서 의도적으로 공유할 때 검토한다. React의 `.eq('app_id', ...)`는 조회 필터다. 테이블 접두사도 이름 구분일 뿐이며, 접근 권한은 GRANT와 RLS로 제어한다. 현재의 로그인 사용자 전체 쓰기 정책 자체가 앱별 접근을 격리하지는 않는다. ([Supabase 권한과 RLS 안내](https://supabase.com/docs/guides/getting-started/api-keys#postgres-roles-and-row-level-security))
+- 회원 계정과 인증 설정, 프로젝트 자원·중단 영향까지 독립적으로 운영해야 한다면 별도 Supabase 프로젝트를 사용한다. 단순히 Vercel 프로젝트가 두 개라는 이유로 Supabase도 두 개를 만들 필요는 없다.
+
+**공유되는 인증 설정의 주의점**
+
+회원 계정·Site URL·Redirect URLs·이메일 설정과 프로젝트 자원은 공유된다. 기존 앱의 Site URL과 허용 주소를 유지하고, 각 앱이 의도한 자기 주소로 인증 메일을 돌려받도록 아래 URL 설정을 적용한다. 서로 다른 도메인의 브라우저 저장소는 분리되므로 한쪽에서 로그인했다고 다른 쪽이 자동 로그인되는 것은 아니다.
+
+현재 [AuthContext](./src/context/AuthContext.jsx)는 옵션 없는 `supabase.auth.signOut()`을 사용하며, SDK의 기본 범위는 `global`이다. 같은 계정의 다른 앱 세션 갱신에도 영향을 줄 수 있지만 다른 도메인의 화면이 즉시 바뀐다는 뜻은 아니다. 현재 세션만 종료하려면 `supabase.auth.signOut({ scope: 'local' })`로 바꾸는 방법을 검토할 수 있다. **이 문서 추가에서는 로그아웃 코드를 변경하지 않았다.** ([Supabase 로그아웃 범위 안내](https://supabase.com/docs/reference/javascript/auth-signout))
+
 ### 1. 기본 설정
 
 **환경변수와 배포 대상**
