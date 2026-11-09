@@ -6,6 +6,7 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 - **소스 코드**: https://github.com/ntt65/B1_2_simple
 - **참고 구현**: https://github.com/ntt65/B1-2
 - **실행 화면**: [스크린샷 보기](#실행-화면)
+- **학습·발표자료**: [QA 문서와 미션·평가 PPTX·PDF](#발표자료)
 - **설정 바로가기**: [Vercel과 Supabase 연동 및 배포 가이드](#vercel과-supabase-연동-및-배포-완벽-가이드) · [로컬 실행 방법](#로컬-실행-방법)
 
 2026-11-10에 미구현 보너스였던 사용자 Context와 Supabase Auth를 추가했다. 현재 문서의 구현 설명은 이 변경을 반영한다. 아래의 과거 실행·배포 기록은 인증 추가 전 기록이며, 이번 변경의 실제 원격 DB 적용·배포 CRUD 검증 결과를 뜻하지 않는다.
@@ -67,6 +68,19 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 로그인한 사용자의 표시 이름·이메일·가입일과 로그아웃 버튼을 보여준다. 이미지의 이메일은 가림 처리했다.
 
 ![Bookmark Keeper 로그인 사용자 프로필 화면](./screenshot/profile.png)
+
+---
+
+## 발표자료
+
+원문의 미션 번호와 평가 번호에 맞춰 QA를 보완하고 발표자료를 각각 만들었다. PPTX에는 발표자 노트와 편집 가능한 표를 넣었으며, PDF는 같은 슬라이드 순서와 내용을 담는다.
+
+| 구분 | 번호 대응 | 보완한 QA | PPTX | PDF |
+| --- | --- | --- | --- | --- |
+| 미션 발표 | 원문 1~8번과 하위 항목 | [미션 QA](./docs/b1_2_mission_QA.md) | [18장 발표자료](./output/presentations/b1_2_mission_presentation.pptx) | [18쪽 PDF](./output/pdf/b1_2_mission_presentation.pdf) |
+| 평가 발표 | 평가 17문항과 6번 평가결과 | [평가 QA](./docs/b1_2_evaluation_questions_QA.md) | [19장 발표자료](./output/presentations/b1_2_evaluation_presentation.pptx) | [19쪽 PDF](./output/pdf/b1_2_evaluation_presentation.pdf) |
+
+QA 문서의 발표용 답변·근거 파일·시연 포인트를 함께 참고한다. 번호·코드·발표 파일 검사와 저장소 반영 결과는 [최종 체크리스트](./docs/b1_2_presentation_checklist.md)에 기록한다.
 
 ---
 

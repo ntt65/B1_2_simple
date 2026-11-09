@@ -1,6 +1,10 @@
 # 평가문항 QA
 
-> 기술 스택 상세: [tech.md](./tech.md)
+> 원문: [평가문항](./b1_2_evaluation_questions.md) · 기술 상세: [tech.md](./tech.md) · 실행 화면: [README](../README.md#실행-화면)
+
+발표자료: [평가 PPTX 19장](../output/presentations/b1_2_evaluation_presentation.pptx), [동일 내용 PDF](../output/pdf/b1_2_evaluation_presentation.pdf). 표지 뒤에 평가 17문항을 각 1장씩 배치하고 마지막에 원문의 6번 평가결과를 구분했다.
+
+원문의 항목과 순서를 유지하고 17개 소문항에 `평가1-1`부터 `평가5-1`까지 번호를 붙였다. 각 문항의 **발표용 답변 → 근거 파일 → 시연 포인트**를 발표 대본으로 사용하고, 뒤의 상세 설명을 질의응답에 활용한다. 항목 5는 원문처럼 하나의 문항 안에서 보너스 세 가지를 설명한다.
 
 2026-11-10 기준 구현 설명이다. 사용자 Context와 인증 보너스를 추가했으며, 원격 테이블 복구와 작성자 ID 전달을 보완했다. 사용자가 전체 `schema.sql`을 적용한 뒤 API 로그인·등록·조회·수정·삭제를 모두 확인했다. 브라우저에서의 전체 UI 조작과 신규 가입 확인 메일의 수신·복귀는 별도 검증이 필요하다.
 
@@ -8,7 +12,15 @@
 
 ## 항목 1
 
-### Q. 최소 5개 이상의 라우트가 동작하고, 잘못된 주소 접근 시 Not Found 페이지가 표시되는가?
+### 평가1-1. 최소 5개 이상의 라우트가 동작하고, 잘못된 주소 접근 시 Not Found 페이지가 표시되는가?
+
+**발표용 답변**: 8개 라우트와 공통 Layout을 구성했습니다. 목록·상세는 공개하고 등록·수정·프로필은 보호 라우트로 감쌌으며, 잘못된 경로는 Not Found 화면으로 보냅니다.
+
+**근거 파일**: [App.jsx](../src/App.jsx), [ProtectedRoute.jsx](../src/components/ProtectedRoute.jsx), [vercel.json](../vercel.json)
+
+**시연 포인트**: 홈→목록→상세로 이동한 뒤 `/not-a-real-page`를 엽니다. 비로그인 상태의 `/bookmarks/new`가 로그인으로 이동하는지도 보여줍니다.
+
+**상세 설명**
 
 **✅**
 
@@ -29,7 +41,15 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ---
 
-### Q. 목록 조회, 상세 조회, 등록, 수정, 삭제가 모두 정상 동작하는가?
+### 평가1-2. 목록 조회, 상세 조회, 등록, 수정, 삭제가 모두 정상 동작하는가?
+
+**발표용 답변**: 북마크 CRUD는 Supabase의 `bookmarks` 테이블을 사용합니다. 등록은 확인한 세션의 사용자 ID를 함께 저장하고, 수정·삭제는 실제 반환 행이 있을 때만 성공으로 처리합니다.
+
+**근거 파일**: [useBookmarks.js](../src/hooks/useBookmarks.js), [useBookmark.js](../src/hooks/useBookmark.js), [BookmarkNewPage.jsx](../src/pages/BookmarkNewPage.jsx), [BookmarkEditPage.jsx](../src/pages/BookmarkEditPage.jsx), [BookmarkDetailPage.jsx](../src/pages/BookmarkDetailPage.jsx), [schema.sql](../schema.sql)
+
+**시연 포인트**: 평가용 북마크 한 건을 등록→목록·상세 확인→수정→삭제 순서로 보여줍니다. 원격 API의 이전 검증 결과와 이번 발표의 UI 시연을 구분합니다.
+
+**상세 설명**
 
 **✅ — 원격 API 로그인·등록·조회·수정·삭제 확인**
 
@@ -51,7 +71,15 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ---
 
-### Q. 로딩/에러/빈 상태가 모든 핵심 화면에서 일관된 방식으로 표시되는가?
+### 평가1-3. 로딩/에러/빈 상태가 모든 핵심 화면에서 일관된 방식으로 표시되는가?
+
+**발표용 답변**: 로딩은 Loading, 오류는 ErrorState, 빈 결과는 EmptyState로 표시합니다. 목록·상세·수정 화면이 공통 컴포넌트를 사용하고, 데이터가 준비되면 실제 화면을 렌더합니다.
+
+**근거 파일**: [Loading.jsx](../src/components/Loading.jsx), [ErrorState.jsx](../src/components/ErrorState.jsx), [EmptyState.jsx](../src/components/EmptyState.jsx), [BookmarkList.jsx](../src/components/BookmarkList.jsx)
+
+**시연 포인트**: 목록 로딩과 재시도 버튼을 보여주고, 결과가 없는 카테고리를 골라 EmptyState와 필터 초기화 버튼을 확인합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -63,7 +91,7 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 | 에러 | `ErrorState` | 메시지 + 재시도 버튼(선택), `role="alert"` |
 | 빈 데이터 | `EmptyState` | 등록 유도 또는 필터 초기화 액션과 안내 메시지 |
 
-`BookmarksPage`, `BookmarkDetailPage`, `BookmarkEditPage` 세 화면 모두 동일한 패턴으로 처리한다.
+`BookmarksPage`, `BookmarkDetailPage`, `BookmarkEditPage`는 `Loading`과 `ErrorState`를 공통으로 사용한다. 목록의 빈 결과는 `BookmarkList` 안의 `EmptyState`로 안내한다. 상세·수정에서 해당 ID의 데이터가 없으면 `ErrorState`로 항목을 찾을 수 없다고 안내한다. 아래 코드는 목록의 조건부 렌더링 예시다.
 
 ```jsx
 {loading && <Loading message="북마크를 불러오는 중..." />}
@@ -73,7 +101,15 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ---
 
-### Q. 폼에서 필수값 검증, 에러 메시지 표시, 제출 중 상태 표시가 동작하는가?
+### 평가1-4. 폼에서 필수값 검증, 에러 메시지 표시, 제출 중 상태 표시가 동작하는가?
+
+**발표용 답변**: 등록·수정은 같은 BookmarkForm을 사용합니다. 제목·URL 필수값과 HTTP/HTTPS 주소를 검증하고, 제출 중 입력·버튼을 잠그며, 실패하면 입력을 유지하고 오류를 표시합니다.
+
+**근거 파일**: [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [Input.jsx](../src/components/Input.jsx), [Button.jsx](../src/components/Button.jsx), [bookmarkUrl.js](../src/lib/bookmarkUrl.js), [bookmarkErrors.js](../src/lib/bookmarkErrors.js)
+
+**시연 포인트**: 빈 제목·URL로 제출하고 잘못된 URL을 입력해 오류를 보여줍니다. 저장 중 잠김과 실패 후 입력 유지도 코드 또는 준비한 실패 테스트로 설명합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -86,7 +122,15 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ---
 
-### Q. 배포된 URL에서 CRUD를 포함한 모든 기능이 정상 동작하는가?
+### 평가1-5. 배포된 URL에서 CRUD를 포함한 모든 기능이 정상 동작하는가?
+
+**발표용 답변**: Vercel 배포와 실제 Supabase API 로그인·CRUD는 이전 검사에서 통과했습니다. 사용자 제공 실행 화면 7장도 있으며, 브라우저 전체 시나리오와 신규 가입 확인 메일 복귀까지 자동 검증했다고 말하지는 않습니다.
+
+**근거 파일**: [README 검증 기록](../README.md#현재-배포-확인-범위), [README 실행 화면](../README.md#실행-화면), [vercel.json](../vercel.json), [package.json](../package.json)
+
+**시연 포인트**: 배포 주소의 목록·상세·등록 흐름과 직접 URL 접근을 보여줍니다. API 기록, 정적 스크린샷, 실제 브라우저 시연을 각각 어떤 근거인지 구분해 설명합니다.
+
+**상세 설명**
 
 **API 로그인·CRUD 확인 완료 — 브라우저 UI·신규 확인 메일 복귀는 별도 검증 필요**
 
@@ -104,43 +148,38 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ## 항목 2
 
-### Q. 데이터 조회/갱신 흐름 중 최소 1개 이상이 커스텀 훅으로 분리되어 있고 왜 분리했는지 설명할 수 있는가?
+### 평가2-1. 데이터 조회/갱신 흐름 중 최소 1개 이상이 커스텀 훅으로 분리되어 있고 왜 분리했는지 설명할 수 있는가?
+
+**발표용 답변**: 목록은 useBookmarks, 단건은 useBookmark로 분리했습니다. 상세와 수정이 같은 단건 조회 로직을 재사용하고, 페이지는 데이터·로딩·오류·refetch를 받아 화면 구성에 집중합니다.
+
+**근거 파일**: [useBookmarks.js](../src/hooks/useBookmarks.js), [useBookmark.js](../src/hooks/useBookmark.js), [BookmarkDetailPage.jsx](../src/pages/BookmarkDetailPage.jsx), [BookmarkEditPage.jsx](../src/pages/BookmarkEditPage.jsx)
+
+**시연 포인트**: 상세·수정 화면이 모두 `useBookmark(id)`를 호출하는 부분과 오류 UI의 `onRetry={refetch}`를 보여줍니다.
+
+**상세 설명**
 
 **✅ — 조회 훅 2개와 인증 훅 1개**
 
-**`src/hooks/useBookmarks.js`** — 목록 조회
-```js
-export function useBookmarks() {
-  const [bookmarks, setBookmarks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const refetch = useCallback(async () => { ... }, []);
-  useEffect(() => { refetch(); }, [refetch]);
-  return { bookmarks, loading, error, refetch };
-}
-```
-- 사용처: `BookmarksPage` (1곳)
+**조회 훅 2개와 Context 접근 훅 1개**
 
-**`src/hooks/useBookmark.js`** — 단건 조회 (id 기반)
-```js
-export function useBookmark(id) {
-  const [bookmark, setBookmark] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const refetch = useCallback(async () => {
-    ...
-    .eq("id", id).maybeSingle();   // 없으면 null, 에러 아님
-  }, [id]);                         // id 바뀌면 새 함수 → useEffect 재실행
-  useEffect(() => { refetch(); }, [refetch]);
-  return { bookmark, loading, error, refetch };
-}
-```
-- 사용처: `BookmarkDetailPage`, `BookmarkEditPage` (2곳)
+| 훅 | 반환 계약·사용 위치 | 내부 처리 |
+| --- | --- | --- |
+| `useBookmarks()` | `bookmarks, loading, error, refetch` → 목록 페이지 | 목록·오류·로딩 state와 최신 요청 번호 관리 |
+| `useBookmark(id)` | `bookmark, loading, error, refetch` → 상세·수정 | `id, bookmark, loading, error`를 한 state 객체에 보관하고 이전 id의 응답 무시 |
+| `useAuth()` | `user, loading, sessionError, signIn, signUp, signOut` → 헤더·로그인·프로필·보호 라우트 | 새 사용자 state를 만들지 않고 AuthProvider의 Context 사용 |
 
-**`src/hooks/useAuth.js`** — `AuthContext`의 로그인 사용자·세션 확인 상태와 로그인·가입·로그아웃 함수를 사용한다. 헤더·로그인·프로필·보호 라우트가 같은 사용자 상태를 공유한다.
+```js
+const { bookmarks, loading, error, refetch } = useBookmarks();
+```
+
+```js
+const { bookmark, loading, error, refetch } = useBookmark(id);
+```
+
+위 코드는 각 화면의 호출 계약을 보여주는 별도 예시다. 같은 훅을 여러 번 호출한다고 그 로컬 state가 자동으로 공유되지는 않는다.
 
 **분리한 이유:**
-1. **관심사 분리**: 페이지 컴포넌트가 Supabase 쿼리를 몰라도 된다. `{ loading, error, data, refetch }`만 받아 화면에 집중한다.
+1. **관심사 분리**: 조회 쿼리와 비동기 상태를 훅으로 옮겨 페이지는 결과와 재시도 함수를 받아 화면 구성에 집중한다. 등록·수정·삭제 쿼리는 각 페이지가 직접 담당한다.
 2. **재사용 제거 중복**: `useBookmark(id)` 없이 구현하면 `BookmarkDetailPage`와 `BookmarkEditPage` 두 곳에 동일한 `useState` + `useEffect` + Supabase 코드가 중복된다.
 3. **외부 `refetch` 호출**: `ErrorState` 재시도 버튼에서 `refetch()`를 직접 호출한다. 훅 내부에 숨기면 외부 트리거가 불가능하다.
 
@@ -148,7 +187,15 @@ export function useBookmark(id) {
 
 ---
 
-### Q. pages, components, hooks(또는 lib)로 폴더가 분리되어 있고 이 구조를 선택한 이유를 설명할 수 있는가?
+### 평가2-2. pages, components, hooks(또는 lib)로 폴더가 분리되어 있고 이 구조를 선택한 이유를 설명할 수 있는가?
+
+**발표용 답변**: pages는 화면과 요청·이동, components는 재사용 UI, hooks는 조회와 Context 사용, context는 사용자 전역 상태, lib는 Supabase·검증·상수를 맡습니다. React가 강제한 구조가 아니라 역할을 찾기 쉽게 나눈 설계입니다.
+
+**근거 파일**: [App.jsx](../src/App.jsx), [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [useBookmark.js](../src/hooks/useBookmark.js), [AuthContext.jsx](../src/context/AuthContext.jsx), [supabase.js](../src/lib/supabase.js)
+
+**시연 포인트**: 등록 화면에서 공용 폼과 Supabase 연결로 이동하며 폴더별 책임을 짚습니다. Layout·링크 카드·ProtectedRoute는 Router나 Context도 사용한다고 설명합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -170,27 +217,46 @@ src/
 
 ---
 
-### Q. 최소 8개 이상의 재사용 컴포넌트가 있고 어떤 기준으로 컴포넌트를 나눴는지 구체적으로 말할 수 있는가?
+### 평가2-3. 최소 8개 이상의 재사용 컴포넌트가 있고 어떤 기준으로 컴포넌트를 나눴는지 구체적으로 말할 수 있는가?
 
-**✅ — 기존 공용 UI 13개와 보호 라우트**
+**발표용 답변**: components에는 15개 파일이 있고, prop에 따라 표시나 동작이 바뀌는 기준으로는 13개입니다. Layout·SetupNotice는 이 prop 기준 집계에서 제외해도 최소 8개를 충족합니다.
+
+**근거 파일**: [components 폴더](../src/components/), [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [Button.jsx](../src/components/Button.jsx), [Select.jsx](../src/components/Select.jsx), [ProtectedRoute.jsx](../src/components/ProtectedRoute.jsx)
+
+**시연 포인트**: 같은 BookmarkForm에 초기값·제출 라벨을 바꿔 등록과 수정을 구성한 부분, Button의 loading·variant, Select의 options를 보여줍니다.
+
+**상세 설명**
+
+**✅ — components 파일 15개, prop 기준 재사용 컴포넌트 13개**
+
+prop 기준 13개는 `Button`, `Input`, `Textarea`, `Select`, `Card`, `Loading`, `ErrorState`, `EmptyState`, `CategoryFilter`, `BookmarkCard`, `BookmarkList`, `BookmarkForm`, `ProtectedRoute`다. `Layout`과 `SetupNotice`는 components 폴더의 파일 수에는 포함하지만 prop을 받는다는 평가 기준의 집계에서는 제외한다.
 
 나누는 기준은 두 가지였다.
 
 **기준 1 — 반복 패턴 추출**: 같은 UI가 여러 곳에서 쓰이면 컴포넌트로 뽑는다.
-- `Loading`, `ErrorState`, `EmptyState`: 세 화면 모두 동일 패턴
+- `Loading`, `ErrorState`: 목록·상세·수정에서 공통 사용
+- `EmptyState`: 목록의 전체 빈 결과와 필터 빈 결과를 공통 UI로 안내
 - `BookmarkForm`: 등록과 수정 폼이 필드 구성이 같아서 `initialValues` prop 하나로 공용화
 
 **기준 2 — 단일 책임**: "이 컴포넌트가 하는 일이 하나인가"를 기준으로 나눈다.
 - `Button`: 클릭 가능한 요소의 스타일과 상태(`variant`, `loading`, `disabled`)만 담당
 - `Input`, `Textarea`, `Select`: label + 입력 + 에러 메시지 하나의 블록으로 묶는 역할만
-- `Card`: 흰 카드 컨테이너 역할만 (내용을 모름)
+- `Card`: 카드 컨테이너 역할만 담당하고 내용은 children으로 받음
 - `BookmarkCard`: 카드 한 장 렌더만 (목록이나 데이터 가져오는 방법을 모름)
 - `BookmarkList`: 배열을 받아 카드를 나열하거나 EmptyState를 보여주는 역할만
 - `ProtectedRoute`: 세션 확인과 비로그인 이동을 등록·수정·프로필 라우트에서 공통 처리
 
 ---
 
-### Q. 로딩/에러/빈 상태 UI가 페이지마다 따로 구현되지 않고 공통 컴포넌트로 통일되어 있는지 코드에서 보여줄 수 있는가?
+### 평가2-4. 로딩/에러/빈 상태 UI가 페이지마다 따로 구현되지 않고 공통 컴포넌트로 통일되어 있는지 코드에서 보여줄 수 있는가?
+
+**발표용 답변**: 목록·상세·수정 페이지가 Loading과 ErrorState를 함께 사용하고, 목록의 빈 결과는 BookmarkList 안에서 EmptyState로 처리합니다. 페이지는 상황에 맞는 메시지·재시도·빈 상태 액션만 전달합니다.
+
+**근거 파일**: [BookmarksPage.jsx](../src/pages/BookmarksPage.jsx), [BookmarkDetailPage.jsx](../src/pages/BookmarkDetailPage.jsx), [BookmarkEditPage.jsx](../src/pages/BookmarkEditPage.jsx), [BookmarkList.jsx](../src/components/BookmarkList.jsx)
+
+**시연 포인트**: 세 페이지의 같은 상태 컴포넌트 import와 조건 분기를 나란히 보여줍니다. 데이터 전체가 없을 때의 등록 유도와 필터 결과만 없을 때의 초기화 액션도 구분합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -201,18 +267,26 @@ src/
 import { Loading } from "../components/Loading";
 import { ErrorState } from "../components/ErrorState";
 
-// 세 페이지 모두 동일한 패턴
+// 상세·수정 페이지의 조기 반환 패턴
 if (loading) return <Loading message="북마크를 불러오는 중..." />;
 if (error)   return <ErrorState message="요청에 실패했습니다." onRetry={refetch} />;
 ```
 
-빈 상태의 공통 화면은 `BookmarkList` 내부에서 `EmptyState`를 사용해 렌더한다. 페이지는 데이터·필터 상황에 맞는 액션을 전달한다.
+목록 페이지는 같은 컴포넌트를 JSX의 `loading && ...`, `!loading && error && ...` 조건으로 렌더한다. 공통 UI를 쓰는 원칙은 같지만 모든 페이지가 같은 조기 반환 코드를 사용하는 것은 아니다. 빈 상태의 공통 화면은 `BookmarkList` 내부에서 `EmptyState`를 사용해 렌더한다. 페이지는 데이터·필터 상황에 맞는 액션을 전달한다.
 
 `BookmarksPage`는 빈 목록에 맞는 `emptyAction`을 전달한다. 전체 북마크가 없으면 등록으로 안내하고, 카테고리 필터에만 결과가 없으면 전체 카테고리로 되돌린다. 비로그인 사용자의 등록 접근은 보호 라우트가 로그인으로 연결한다.
 
 ---
 
-### Q. 커스텀 훅으로 분리한 데이터 흐름이 1개 이상 있고 왜 훅으로 분리했는지 이유를 말할 수 있는가?
+### 평가2-5. 커스텀 훅으로 분리한 데이터 흐름이 1개 이상 있고 왜 훅으로 분리했는지 이유를 말할 수 있는가?
+
+**발표용 답변**: useBookmark는 URL의 id가 바뀌면 다시 조회하며, 재시도와 늦은 응답 처리를 한곳에서 관리합니다. 같은 훅을 사용해도 호출마다 상태는 독립적이고, 여러 화면이 공유하는 사용자 상태는 useAuth를 통해 Context에서 읽습니다.
+
+**근거 파일**: [useBookmark.js](../src/hooks/useBookmark.js), [useAuth.js](../src/hooks/useAuth.js), [AuthContext.jsx](../src/context/AuthContext.jsx), [BookmarkQueries.test.jsx](../tests/BookmarkQueries.test.jsx)
+
+**시연 포인트**: id 의존성과 requestSequence 검사를 짚고, 이전 요청의 늦은 응답이 새 화면을 덮지 않는 회귀 테스트를 보여줍니다.
+
+**상세 설명**
 
 앞의 항목 2 첫 번째 답변과 동일하다. 조회 훅 `useBookmarks`, `useBookmark(id)`와 인증 훅 `useAuth`가 있다. 조회 훅의 분리 이유는 관심사 분리·재사용·외부 `refetch` 호출이며, `useAuth`는 여러 화면이 같은 사용자 Context를 사용하도록 한다.
 
@@ -220,7 +294,15 @@ if (error)   return <ErrorState message="요청에 실패했습니다." onRetry=
 
 ## 항목 3
 
-### Q. props와 state의 차이를 구분하고 상태를 어디에 두었는지 흐름을 따라며 대답할 수 있는가?
+### 평가3-1. props와 state의 차이를 구분하고 상태를 어디에 두었는지 흐름을 따라며 대답할 수 있는가?
+
+**발표용 답변**: props는 부모가 내려주는 읽기 전용 입력이고 state는 컴포넌트가 기억하며 갱신하는 값입니다. 폼 입력은 폼, 카테고리는 목록 페이지, 조회 결과는 조회 훅, 로그인 사용자는 AuthContext에 둡니다.
+
+**근거 파일**: [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [BookmarksPage.jsx](../src/pages/BookmarksPage.jsx), [BookmarkNewPage.jsx](../src/pages/BookmarkNewPage.jsx), [AuthContext.jsx](../src/context/AuthContext.jsx)
+
+**시연 포인트**: Input에 전달되는 value·onChange와 폼의 setValues를 연결해 보여준 뒤, 부모가 onSubmit으로 저장 동작을 주입하는 부분을 설명합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -252,39 +334,50 @@ AuthProvider
 
 ---
 
-### Q. useEffect가 언제 실행되는지, 의존성 배열이 어떤 역할을 하는지 본인 코드 기준으로 짚어가며 답변할 수 있는가?
+### 평가3-2. useEffect가 언제 실행되는지, 의존성 배열이 어떤 역할을 하는지 본인 코드 기준으로 짚어가며 답변할 수 있는가?
 
-**✅**
+**발표용 답변**: Effect는 커밋 후 외부 데이터와 동기화하며, 의존성 값이 바뀌면 정리 후 다시 설정됩니다. 목록의 refetch는 안정된 참조를 유지하고 단건은 id에 의존하며, StrictMode의 추가 실행과 재마운트 때문에 조회를 무조건 한 번이라고 말할 수는 없습니다.
 
-`useBookmarks`와 `useBookmark` 두 훅에서 사용한다.
+**근거 파일**: [useBookmarks.js](../src/hooks/useBookmarks.js), [useBookmark.js](../src/hooks/useBookmark.js), [main.jsx](../src/main.jsx), [AuthContext.jsx](../src/context/AuthContext.jsx)
+
+**시연 포인트**: `useCallback(..., [id])`와 `useEffect(..., [refetch])`, 정리 함수의 requestSequence 증가를 보여줍니다. 개발 모드의 추가 요청과 id 변경·재시도를 구분합니다.
+
+**상세 설명**
+
+| 코드 | 다시 조회하는 조건 |
+| --- | --- |
+| `useBookmarks`의 `useCallback(..., [])` | 같은 마운트에서는 refetch 참조 유지. 재마운트·직접 refetch 호출 시 조회 |
+| `useBookmark`의 `useCallback(..., [id])` | id 변경 시 새 refetch 참조 생성 |
+| 두 훅의 `useEffect(..., [refetch])` | 첫 설정과 refetch 참조 변경 시 실행 |
+
+Effect 정리는 언마운트와 의존성 변경 때 이전 요청 결과를 무효화한다. 네트워크 요청을 취소한다고 설명하지 않고, 현재 코드가 **늦은 응답의 state 반영을 무시한다**고 설명한다.
 
 ```js
-// useBookmarks — 마운트 1회만 실행
-const refetch = useCallback(async () => { ... }, []);
-//                                                ↑ 의존성 없음 → 컴포넌트 생명주기 동안 같은 함수 참조 유지
 useEffect(() => {
+  mounted.current = true;
   refetch();
+  return () => {
+    mounted.current = false;
+    requestSequence.current += 1;
+  };
 }, [refetch]);
-// refetch가 항상 같은 참조 → useEffect는 마운트 시 1회만 실행됨
-
-// useBookmark(id) — id 바뀔 때마다 재실행
-const refetch = useCallback(async () => { ... }, [id]);
-//                                                ↑ id가 바뀌면 새 함수 생성
-useEffect(() => {
-  refetch();
-}, [refetch]);
-// refetch 참조가 바뀌었으므로 useEffect 재실행 → 새 id로 재조회
 ```
 
-의존성 배열의 역할: React가 이전 렌더와 현재 렌더의 배열 값을 비교(`Object.is`)해서 하나라도 달라졌으면 effect를 재실행한다. 빈 배열 `[]`이면 비교할 대상이 없어 마운트 1회만 실행된다.
+React는 의존성 배열의 각 값을 `Object.is`로 비교한다. 개발 모드의 StrictMode에서는 설정→정리→설정이 추가로 수행될 수 있다. 재진입·재시도·id 변경도 있으므로 API가 항상 한 번만 호출된다고 보장하지 않는다. `useCallback`은 이 구현에서 Effect 의존성을 안정화하는 선택이며, 모든 Effect에 반드시 필요한 문법은 아니다.
 
-여기서 1회는 일반적인 마운트 흐름을 설명한다. 개발 모드의 StrictMode는 Effect를 추가 실행하므로 개발 중 추가 조회가 보일 수 있다. 인증 Context도 Effect 정리에서 이벤트 구독을 해제한다.
-
-기술 상세 → [tech.md — useEffect + useCallback 패턴](./tech.md#useeffect--usecallback-패턴)
+기술 상세 → [tech.md — StrictMode](./tech.md#react-strictmode-개발-동작)
 
 ---
 
-### Q. 비동기 데이터 요청 시 로딩/성공/실패/빈 상태를 React에서 어떤 방식으로 처리했는지 보여주고 설명할 수 있는가?
+### 평가3-3. 비동기 데이터 요청 시 로딩/성공/실패/빈 상태를 React에서 어떤 방식으로 처리했는지 보여주고 설명할 수 있는가?
+
+**발표용 답변**: 요청 시작에는 loading을 켜고 이전 오류를 지웁니다. 종료 후 오류가 있으면 ErrorState, 정상 빈 결과면 EmptyState, 데이터가 있으면 목록·상세를 표시합니다. error는 boolean이 아니라 오류 메시지 또는 null입니다.
+
+**근거 파일**: [useBookmarks.js](../src/hooks/useBookmarks.js), [useBookmark.js](../src/hooks/useBookmark.js), [BookmarksPage.jsx](../src/pages/BookmarksPage.jsx), [BookmarkList.jsx](../src/components/BookmarkList.jsx)
+
+**시연 포인트**: loading→오류/성공 분기와 빈 배열 처리를 코드로 짚고, 결과 없는 필터를 선택해 원본 데이터가 있어도 빈 필터 결과를 보여줄 수 있음을 설명합니다.
+
+**상세 설명**
 
 **✅**
 
@@ -307,7 +400,15 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 ---
 
-### Q. 상태 변경이 화면 변화로 이어지는 지점을 3군데 이상 코드에서 짚어가며 설명할 수 있는가?
+### 평가3-4. 상태 변경이 화면 변화로 이어지는 지점을 3군데 이상 코드에서 짚어가며 설명할 수 있는가?
+
+**발표용 답변**: 카테고리 변경은 카드 목록, 검증 오류는 입력 아래 메시지, submitting은 비활성 버튼으로 이어집니다. 로그인 user 변경은 헤더·보호 경로, 저장 성공 안내와 닫기 상태는 상단 메시지를 바꿉니다.
+
+**근거 파일**: [BookmarksPage.jsx](../src/pages/BookmarksPage.jsx), [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [Layout.jsx](../src/components/Layout.jsx), [AuthContext.jsx](../src/context/AuthContext.jsx)
+
+**시연 포인트**: 필터 선택→제목 입력·빈값 오류→저장 중 버튼→성공 안내 닫기 중 세 가지 이상을 연속으로 보여줍니다.
+
+**상세 설명**
 
 **✅ — 7곳**
 
@@ -325,7 +426,15 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 ## 항목 4
 
-### Q. 하나의 기능이 동작하기까지 라우팅 → 컴포넌트 → 상태 → 이벤트 → 렌더링이 어떻게 이어지는지 설명할 수 있는가?
+### 평가4-1. 하나의 기능이 동작하기까지 라우팅 -> 컴포넌트 -> 상태 -> 이벤트 -> 렌더링이 어떻게 이어지는지 설명할 수 있는가?
+
+**발표용 답변**: 등록 URL이 보호 라우트를 거쳐 BookmarkNewPage와 공용 폼을 렌더합니다. 입력 state를 갱신하고 제출 이벤트로 검증·저장을 수행한 뒤, 성공하면 새 상세 화면으로 이동하면서 안내 메시지를 표시합니다.
+
+**근거 파일**: [App.jsx](../src/App.jsx), [ProtectedRoute.jsx](../src/components/ProtectedRoute.jsx), [BookmarkNewPage.jsx](../src/pages/BookmarkNewPage.jsx), [BookmarkForm.jsx](../src/components/BookmarkForm.jsx), [Layout.jsx](../src/components/Layout.jsx)
+
+**시연 포인트**: `/bookmarks/new`→로그인 복귀→입력→제출→Supabase 요청→상세·성공 안내 순서로 발표합니다. 실패 때는 이동하지 않고 폼에 오류가 남는 분기도 짚습니다.
+
+**상세 설명**
 
 **✅ — 북마크 등록 흐름 예시**
 
@@ -365,7 +474,15 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 ---
 
-### Q. Supabase 또는 Firebase를 선택한 이유와 연동하면서 겪은 어려움을 구체적으로 말할 수 있는가?
+### 평가4-2. Supabase 또는 Firebase를 선택한 이유와 연동하면서 겪은 어려움을 구체적으로 말할 수 있는가?
+
+**발표용 답변**: 단일 테이블 CRUD와 SQL·Auth·권한 정책을 함께 설명하기 위해 Supabase를 사용했습니다. 실제 memo 누락과 수정·삭제 0행 문제를 진단 SQL·전체 schema 적용·반환 행 검사로 해결했으며, Firebase보다 항상 단순하다고 일반화하지 않습니다.
+
+**근거 파일**: [schema.sql](../schema.sql), [diagnose-bookmarks.sql](../supabase/diagnose-bookmarks.sql), [bookmarkErrors.js](../src/lib/bookmarkErrors.js), [README 배포 가이드](../README.md#vercel과-supabase-연동-및-배포-완벽-가이드)
+
+**시연 포인트**: `42703`의 memo 누락과 CREATE TABLE IF NOT EXISTS의 한계를 설명하고, GRANT·RLS·실제 반환 행까지 확인한 복구 과정을 보여줍니다.
+
+**상세 설명**
 
 **✅**
 
@@ -373,8 +490,8 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 | 기준 | Supabase | Firebase |
 | --- | --- | --- |
-| DB 구조 | PostgreSQL — 컬럼·타입 명확, `schema.sql`로 버전 관리 가능 | NoSQL — 단순 CRUD에 컬렉션 설계 오버헤드 |
-| SDK 가독성 | `.from("bookmarks").select("*").order(...)` — SQL과 1:1 | `.collection("bookmarks").orderBy(...)` — Firebase 전용 문법 |
+| 데이터 모델 | PostgreSQL 테이블·컬럼과 SQL 복구 과정을 학습 | Firestore 등 문서 모델도 CRUD 구현 가능 |
+| 이 프로젝트의 선택 | SQL·원격 CRUD·Auth·RLS를 한 흐름으로 설명 | Firebase도 SDK와 Security Rules로 구현 가능 |
 | 권한 관리 | `schema.sql`로 공개 조회·로그인 사용자 쓰기 정책 관리 | Security Rules로 데이터 접근 권한 관리 |
 
 **연동 중 겪은 어려움과 해결:**
@@ -387,13 +504,23 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 | 수정·삭제가 0행인데 성공처럼 이동 | 권한 거부나 대상 삭제에도 요청 오류가 없을 수 있음 | 변경된 행을 반환받아 확인하고, 없으면 실패 표시 |
 | 원격 API `42703`: `bookmarks.memo` 누락 | 기존 테이블에는 `CREATE TABLE IF NOT EXISTS`만으로 컬럼이 추가되지 않으며, `category`·`user_id`만 보완한 상태에서 `memo`가 빠짐 | 진단 SQL로 현재 계약 확인 후 `schema.sql` 전체 실행. 앱은 등록 시 세션 사용자의 `user_id`를 전달하고 DB 오류 원인을 안내 |
 
-상세 → [tech.md — Supabase 선택 이유](./tech.md#supabase-선택-이유)
+현재 앱은 `bookmarks`를 사용하고 비교 대상 B1-2는 `items`를 사용하므로 테이블은 이미 분리되어 있다. 공유하는 Supabase 프로젝트의 Auth 설정과 데이터 테이블 경계를 구분하며, 이번 복구 SQL은 `public.bookmarks`를 대상으로 한다.
+
+상세 → [tech.md — Supabase 선택 이유](./tech.md#supabase-선택-이유), [참고 B1-2 API](https://github.com/ntt65/B1-2/blob/main/src/lib/api.js)
 
 ---
 
 ## 항목 5
 
-### 보너스 문제 해결에 따른 크레딧 부여
+### 평가5-1. 보너스 문제 해결에 따른 크레딧 부여
+
+**발표용 답변**: 보너스는 사용자 Context, useMemo·useCallback, Supabase Auth와 보호 라우트의 세 가지를 구현했습니다. 성능 향상 수치를 측정했다고 주장하지 않으며, 현재 앱 로그아웃은 SDK 기본 global scope이고 앱별 local 로그아웃 분리는 적용하지 않았습니다.
+
+**근거 파일**: [AuthContext.jsx](../src/context/AuthContext.jsx), [useAuth.js](../src/hooks/useAuth.js), [BookmarksPage.jsx](../src/pages/BookmarksPage.jsx), [ProtectedRoute.jsx](../src/components/ProtectedRoute.jsx), [ProfilePage.jsx](../src/pages/ProfilePage.jsx)
+
+**시연 포인트**: 로그인 상태에 따른 헤더·보호 경로, 필터의 useMemo, 프로필의 로그아웃 호출을 설명합니다. 공유 Auth 프로젝트의 다른 세션에 미칠 수 있는 영향도 짚습니다.
+
+**상세 설명**
 
 | 보너스 항목 | 구현 | 내용 |
 | --- | --- | --- |
@@ -403,11 +530,17 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 인증 흐름은 `main.jsx`의 `AuthProvider` → `AuthContext.jsx`의 세션 확인·이벤트 구독 → `useAuth` → 각 화면의 조건부 렌더링으로 이어진다. `LoginPage`는 제출 중 버튼·모드 전환을 잠그고 실패 시 입력을 유지한다. 가입 직후 세션이 없으면 메일 확인 안내를 표시한다. 복귀 경로는 `authRedirect.js`에서 검증해 외부 주소로 이동하지 않도록 한다.
 
+`useMemo`와 `useCallback`을 사용했다는 사실과 실제 성능 개선을 측정했다는 주장은 구분한다. 현재 작은 목록에 대한 전후 성능 측정 결과는 없다.
+
+현재 `AuthContext`는 `supabase.auth.signOut()`을 scope 인자 없이 호출하므로 설치된 SDK의 기본값인 `global`을 사용한다. 앱별 `local` scope 분리는 아직 구현하지 않았다. 이전 원격 API 검사에서는 검증용 세션 정리에만 `local` scope를 사용했으며, 이 기록을 앱 로그아웃 구현과 혼동하지 않는다. 같은 Supabase Auth 프로젝트의 다른 세션 갱신에 영향을 줄 수 있어, 시연 전에 범위를 설명한다.
+
 보호 라우트와 쓰기 UI는 정상 화면 접근을 제어하며, 직접 HTTP 요청에 대한 데이터 권한은 Supabase에 실제 적용된 RLS가 결정한다. 이 저장소의 SQL은 로그인 사용자 모두에게 북마크 쓰기를 허용하는 공유 데이터 정책이다. 작성자 ID를 `user_id`에 기록해도 소유자 전용 권한을 강제하지 않는다.
 
 ---
 
 ## 6. 평가결과
+
+원문 소문항 17개에 답변·코드 근거·시연 포인트를 대응시켰다. 원격 API의 이전 검증과 사용자 제공 정적 화면을 근거로 설명하며, 실제 시연을 하지 않은 항목까지 완료로 확대하지 않는다.
 
 | 항목 | 결과 |
 | --- | --- |
@@ -418,3 +551,24 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 | 항목 5 — 보너스 | ✅ 전역 사용자 Context·메모이제이션·Supabase Auth 및 보호 라우트 구현 |
 
 **필수 기능과 보너스 3개를 구현했고 원격 API 로그인·CRUD를 확인했다. 브라우저 전체 UI 조작과 신규 가입 확인 메일의 수신·복귀는 별도로 확인한다.**
+
+### 발표 자료에 사용할 실행 화면 7장
+
+| 파일 | 보여주는 내용 | 연결할 문항 |
+| --- | --- | --- |
+| [bookmark_start.png](../screenshot/bookmark_start.png) | 홈·목록/등록 진입 | 평가1-1, 평가1-5 |
+| [logup.png](../screenshot/logup.png) | 회원가입 입력 폼 | 평가1-4, 평가5-1 |
+| [login.png](../screenshot/login.png) | 로그인 탭의 가입 후 확인 메일 안내 | 평가1-5, 평가5-1 |
+| [bookmark_list.png](../screenshot/bookmark_list.png) | 목록·카테고리 필터 | 평가1-2, 평가3-4 |
+| [bookmark_regi_confirm.png](../screenshot/bookmark_regi_confirm.png) | 등록 전 입력 화면 | 평가1-4, 평가4-1 |
+| [bookmark.png](../screenshot/bookmark.png) | 등록 완료·상세·수정/삭제 메뉴 | 평가1-2, 평가4-1 |
+| [profile.png](../screenshot/profile.png) | 사용자 프로필·로그아웃 버튼 | 평가3-1, 평가5-1 |
+
+이미지는 사용자가 제공한 정적 실행 화면이다. 계정 이메일의 마스킹을 유지하며, 과거 탭 스타일이 포함될 수 있다. 가입 안내 이미지는 신규 이메일 확인·복귀가 완료되었다는 증거가 아니며, 정적 이미지 7장을 브라우저 전체 자동 시나리오 검사로 설명하지 않는다.
+
+### 검증 결과와 설명 범위
+
+- 현재 코드: 8개 라우트, components 15개 파일 중 prop 기준 13개, 조회 훅 2개와 인증 Context 접근 훅 1개.
+- 이번 로컬 재검증: 테스트 8개 파일·62개 항목 통과. 빌드·린트 결과와 상세 실행 기록은 README 및 이번 작업의 최종 검증 결과를 함께 확인한다.
+- 기존 원격 검증: 사용자 전체 SQL 적용 후 평가 계정 API 로그인·등록·조회·수정·삭제 통과, 검사 행과 검증용 세션 정리 완료.
+- 남은 검증 범위: 브라우저 전체 UI 시나리오와 신규 가입 확인 메일 수신·이 앱으로의 복귀. 현재 앱의 로그아웃 scope는 global이며 앱별 local 분리 완료로 발표하지 않는다.
