@@ -84,14 +84,16 @@ React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:
 
 ### Q. 배포된 URL에서 CRUD를 포함한 모든 기능이 정상 동작하는가?
 
-**확인 필요 — 인증 추가 버전의 원격 검증 전**
+**일부 확인 — 배포 홈·읽기 API 접근 확인, 원격 CRUD·인증 검증 필요**
 
-- 기존 문서의 배포 URL은 https://codyssey-b1-2.vercel.app 이며, 현재 저장소·인증 추가 버전과의 배포 연결 상태는 별도 확인해야 한다.
-- Vercel에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`와 필요 시 `VITE_APP_URL`을 등록하고 재배포한다.
-- Supabase에서 이메일 인증·인증 메일 복귀 주소를 설정하고 기존 DB용 쓰기 권한 SQL을 적용한다.
-- 비로그인 공개 조회와 쓰기 차단, 가입 메일 확인, 로그인 후 등록·수정·삭제·프로필·로그아웃을 실제 배포 주소에서 확인해야 한다.
+- 현재 배포 URL은 https://b1-2-simple.vercel.app 이다. 사용자 제공 화면에서 Bookmark Keeper 홈·로그인 메뉴·공개 조회/로그인 쓰기 안내가 현재 구현과 일치하는 것을 확인했다.
+- 홈·배포 JavaScript의 HTTP 200을 확인했다. `/bookmarks`, `/login`, `/bookmarks/new`, `/profile`, `/not-a-real-page`도 HTTP 200과 React 앱 HTML을 반환했다. 이는 SPA rewrite의 HTTP 응답 확인이며, 해당 화면 렌더링·보호 라우트의 로그인 차단을 브라우저에서 검증한 것은 아니다.
+- Supabase의 `GET /rest/v1/bookmarks?select=id&limit=0`이 HTTP 200을 반환했다. 실제 데이터를 가져오거나 변경하지 않고 읽기 API 접근성만 확인했다.
+- `GET /auth/v1/settings`의 HTTP 200과 이메일 인증 활성화·회원가입 허용·이메일 확인 필요 설정을 확인했다. 로그인·회원가입 요청이나 메일 발송은 실행하지 않았다.
+- 기존 B1-2와 공유하는 Supabase 프로젝트의 Site URL·허용 주소는 유지하고, Redirect URLs에 `https://b1-2-simple.vercel.app/**`를 추가해야 한다. `VITE_APP_URL`을 사용한다면 이 앱의 주소를 지정하고 실제 새 확인 메일의 복귀 링크를 확인한다.
+- 실제 목록·상세 데이터 표시, 로그인 후 등록·수정·삭제·프로필·로그아웃, 인증 메일 수신·복귀는 추가 검증이 필요하다. 원격 DB 정책 원문과 쓰기 권한도 아직 확인하지 않았으며, SQL 파일 추가만으로 원격 적용 여부를 확정하지 않는다.
 
-이번 변경의 자동 테스트는 외부 Supabase 응답을 대체한다. 실제 원격 DB·메일·배포 성공을 의미하지 않는다.
+이 확인은 2026-11-10의 홈 화면과 읽기 전용 HTTP 검사에 한정된다. 공개 연결값을 파일이나 검사 로그에 저장하지 않았다. 자동 테스트는 외부 Supabase 응답을 대체하므로 실제 원격 DB·메일·인증 CRUD 성공을 대신하지 않는다. 이전 배포 URL `https://codyssey-b1-2.vercel.app`의 기록은 README의 과거 배포 구역에 보존했다.
 
 ---
 

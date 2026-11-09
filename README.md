@@ -2,7 +2,7 @@
 
 React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카테고리별로 저장하고, 메모를 남기고, 목록/상세/등록/수정/삭제를 수행한다. 목록·상세는 공개하며, 등록·수정·삭제에는 로그인이 필요하다. 로그인 사용자끼리는 북마크를 공유한다.
 
-- **기존 문서의 배포 URL**: https://codyssey-b1-2.vercel.app (이번 인증 추가 버전의 배포 여부는 별도 확인 필요)
+- **현재 배포 URL**: https://b1-2-simple.vercel.app
 - **소스 코드**: https://github.com/ntt65/B1_2_simple
 - **참고 구현**: https://github.com/ntt65/B1-2
 
@@ -27,7 +27,7 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 | 제출 중 상태 표시 | ✅ | `submitting: true` → 버튼 비활성화 + "처리 중..." 텍스트 |
 | 로딩/에러/빈 상태 통일 | ✅ | `Loading`, `ErrorState`, `EmptyState` 공용 컴포넌트로 모든 화면 통일 |
 | 상태 → 렌더 변화 3곳 이상 | ✅ | 카테고리 필터, 로딩, 검증 에러, 제출 중, 삭제 에러, 사용자 상태, 성공 안내 |
-| 배포 | 확인 필요 | Vercel SPA rewrite 설정 제공. 인증용 환경변수·이메일 복귀 주소·원격 권한 정책 적용 후 실제 배포 검증 필요 |
+| 배포 | 홈·읽기 API 접근 확인 | 사용자 제공 홈 화면, 배포 경로·JS의 HTTP 응답, Supabase 읽기 API와 공개 인증 설정 확인. 로그인·실제 CRUD·인증 메일은 별도 검증 필요 |
 | 보너스: 성능 최적화 | ✅ | `useMemo` (필터 결과), `useCallback` (refetch 메모이제이션) |
 | 보너스: 전역 상태 | ✅ | `AuthContext`의 사용자·세션 확인 상태를 헤더·로그인·프로필·보호 라우트에서 공유 |
 | 보너스: 인증 | ✅ | Supabase 이메일 로그인·회원가입·로그아웃, 보호 라우트와 로그인 후 원래 경로 복귀 |
@@ -389,7 +389,7 @@ VITE_APP_URL=http://localhost:5173
 
 Supabase에 새 테이블을 만들 때는 [schema.sql](./schema.sql)을 SQL Editor에서 실행한다. 기존 `bookmarks` 테이블의 익명 쓰기를 로그인 사용자 쓰기로 전환할 때는 [supabase/policies-authenticated-writes.sql](./supabase/policies-authenticated-writes.sql)의 안내대로 현재 정책을 보관한 뒤 적용한다. SQL 파일을 저장한 것만으로 원격 DB가 변경되지는 않는다.
 
-Supabase Dashboard에서 이메일 인증을 활성화하고, **Authentication → URL Configuration**의 Site URL과 Redirect URLs에 사용할 로컬·배포 주소를 등록한다. 가입 확인 메일의 복귀 주소는 `VITE_APP_URL` 또는 현재 origin에 `/login?redirect=...`를 붙여 만든다. Redirect URLs에서 이 로그인 경로와 쿼리를 허용해야 한다. 개발 환경의 예시는 `http://localhost:5173/**`이며, 배포 환경은 실제 배포 도메인의 필요한 로그인 복귀 주소를 허용한다. 이메일 확인이 필요한 프로젝트에서는 가입 후 메일의 링크를 확인한 다음 로그인한다.
+가입 확인 메일의 복귀 주소는 `VITE_APP_URL` 또는 현재 origin에 `/login?redirect=...`를 붙여 만든다. `VITE_APP_URL`을 사용한다면 이 앱의 주소로 설정한다. 기존 B1-2와 Supabase 프로젝트를 공유할 때는 **Authentication → URL Configuration**의 기존 Site URL·허용 주소를 유지하고, Redirect URLs에 `https://b1-2-simple.vercel.app/**`를 추가한다. 로컬 인증도 사용할 때는 `http://localhost:5173/**`를 별도로 허용한다. 현재 공개 인증 설정은 이메일 로그인·회원가입이 가능하고 이메일 확인이 필요한 상태다. 실제 새 확인 메일의 링크가 이 앱으로 돌아오는지 추가로 확인해야 한다.
 
 배포 시 Vercel에도 같은 공개 환경변수를 등록하고 다시 빌드한다. 목록·상세는 비로그인 상태에서 확인하고, 등록·수정·삭제·프로필은 테스트용 계정으로 로그인해 확인한다. 현재 저장소에는 실제 `.env` 값이 포함되어 있지 않으며, 이번 변경에서 원격 DB 정책 적용이나 배포된 인증 CRUD를 수행하지 않았다.
 
@@ -404,6 +404,20 @@ npm run build
 자동 테스트는 Supabase 응답을 대체해 인증 상태·보호 라우트·오류 처리를 확인한다. 실제 이메일 수신과 원격 RLS·배포 CRUD 확인은 별도로 필요하다.
 
 2026-11-10 로컬 검증: `npm run build`, `npm run lint`, `npm test` 모두 통과했다. 테스트는 7개 파일의 51개 항목이며 인증·권한·URL 검증·조회 응답 경합을 포함한다. 갱신한 잠금 파일은 `npm ci --dry-run --offline`으로 일관성을 확인했다.
+
+### 현재 배포 확인 범위
+
+현재 배포 주소는 https://b1-2-simple.vercel.app 이다. 2026-11-10에 확인한 범위는 다음과 같다.
+
+| 확인 대상 | 결과와 의미 |
+| --- | --- |
+| 사용자 제공 홈 화면 | Bookmark Keeper 홈·로그인 메뉴·공개 조회/로그인 쓰기 안내 확인 |
+| 홈과 배포 JavaScript | HTTP 200 응답 확인 |
+| `/bookmarks`, `/login`, `/bookmarks/new`, `/profile`, `/not-a-real-page` | HTTP 200과 React 앱 HTML 응답 확인. SPA rewrite의 HTTP 응답 확인이며, 각 화면의 렌더링·로그인 차단을 브라우저에서 검증한 것은 아님 |
+| Supabase `GET /rest/v1/bookmarks?select=id&limit=0` | HTTP 200. 데이터를 가져오거나 변경하지 않는 요청으로 테이블 읽기 API 접근성 확인 |
+| Supabase `GET /auth/v1/settings` | HTTP 200. 이메일 인증 활성화, 회원가입 허용, 이메일 확인 필요 설정 확인 |
+
+실제 목록·상세 데이터 표시, 로그인·회원가입·로그아웃, 확인 메일 수신과 이 앱으로의 복귀, 원격 DB 정책 원문·쓰기 권한, 등록·수정·삭제는 아직 검증하지 않았다. 원격 쓰기나 메일 발송을 실행하지 않았으며, 공개 연결값을 파일이나 검사 로그에 저장하지 않았다.
 
 ### `useAuth()` — 사용자 상태 공유
 
