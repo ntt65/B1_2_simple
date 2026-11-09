@@ -128,7 +128,24 @@ h1, h2, h3 { color: var(--text-h); }
 .app-header { gap: 16px; flex-wrap: wrap; }
 .app-header nav { flex-wrap: wrap; align-items: center; }
 .auth-page { max-width: 480px; margin: 0 auto; }
+.auth-tabs { display: flex; gap: 24px; margin-top: 24px; border-bottom: 1px solid var(--border); }
+.auth-tab {
+  padding: 10px 4px;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.auth-tab:hover:not(:disabled) { color: var(--accent); }
+.auth-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.auth-tab:disabled { opacity: 0.6; cursor: not-allowed; }
 .auth-form { margin-top: 20px; }
+.auth-form > .btn { width: 100%; min-height: 44px; margin-top: 4px; }
 .auth-actions, .detail-actions, .home-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .profile-details { display: grid; grid-template-columns: auto 1fr; gap: 12px 20px; }
 .profile-details dt { font-weight: 600; }

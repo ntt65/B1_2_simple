@@ -92,9 +92,9 @@ export function LoginPage() {
     <section className="auth-page">
       <h1>{signingUp ? "회원가입" : "로그인"}</h1>
       <p>북마크 등록·수정·삭제는 로그인 후 사용할 수 있습니다.</p>
-      <div className="auth-actions" role="tablist" aria-label="로그인 방식">
-        <Button type="button" role="tab" variant={signingUp ? "secondary" : "primary"} aria-selected={!signingUp} disabled={submitting} onClick={() => changeMode("signin")}>로그인</Button>
-        <Button type="button" role="tab" variant={signingUp ? "primary" : "secondary"} aria-selected={signingUp} disabled={submitting} onClick={() => changeMode("signup")}>회원가입</Button>
+      <div className="auth-tabs" role="tablist" aria-label="로그인 방식">
+        <button className="auth-tab" type="button" role="tab" aria-selected={!signingUp} disabled={submitting} onClick={() => changeMode("signin")}>로그인</button>
+        <button className="auth-tab" type="button" role="tab" aria-selected={signingUp} disabled={submitting} onClick={() => changeMode("signup")}>회원가입</button>
       </div>
       {!isSupabaseConfigured && <ErrorState message="Supabase 연결 설정이 필요합니다. .env의 프로젝트 URL과 공개 키를 확인하세요." />}
       <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={submitting}>
