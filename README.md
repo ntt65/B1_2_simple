@@ -8,6 +8,8 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 
 2026-11-10에 미구현 보너스였던 사용자 Context와 Supabase Auth를 추가했다. 현재 문서의 구현 설명은 이 변경을 반영한다. 아래의 과거 실행·배포 기록은 인증 추가 전 기록이며, 이번 변경의 실제 원격 DB 적용·배포 CRUD 검증 결과를 뜻하지 않는다.
 
+등록 오류 수정 코드 [18f603e](https://github.com/ntt65/B1_2_simple/commit/18f603e)의 Vercel 배포 완료와 실제 배포 JavaScript 반영을 확인했다. 사용자 SQL 적용 후 평가 계정의 원격 API 로그인·CRUD도 모두 통과했다.
+
 ---
 
 ## 회원가입·로그인 화면과 평가용 계정
@@ -43,13 +45,13 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 | Not Found 페이지 | ✅ | `*` → `NotFoundPage` (404 메시지 + 홈으로 링크) |
 | 재사용 컴포넌트 8개 이상 | ✅ | 기존 공용 UI 13개와 `ProtectedRoute` (등록·수정·프로필 경로에서 재사용) |
 | 커스텀 훅 1개 이상 | ✅ | `useBookmarks()`, `useBookmark(id)`, `useAuth()` 3개 |
-| CRUD 전체 | ✅ | 목록/상세 조회, 등록, 수정, 삭제 — Supabase 원격 DB 기준 |
+| CRUD 전체 | ✅ 원격 API 검증 완료 | 전체 `schema.sql` 적용 후 평가 계정의 API 로그인·등록·단건 조회·수정·삭제 성공, 검사 행 모두 정리 |
 | 폼 필수값 검증 | ✅ | `validate()` — title, url 필수값과 HTTP/HTTPS URL 형식 검증 |
 | 폼 에러 메시지 표시 | ✅ | 필드 바로 아래 인라인 에러 메시지, `invalid` 클래스로 테두리 강조 |
 | 제출 중 상태 표시 | ✅ | `submitting: true` → 버튼 비활성화 + "처리 중..." 텍스트 |
 | 로딩/에러/빈 상태 통일 | ✅ | `Loading`, `ErrorState`, `EmptyState` 공용 컴포넌트로 모든 화면 통일 |
 | 상태 → 렌더 변화 3곳 이상 | ✅ | 카테고리 필터, 로딩, 검증 에러, 제출 중, 삭제 에러, 사용자 상태, 성공 안내 |
-| 배포 | 홈·읽기 API 접근 확인 | 사용자 제공 홈 화면, 배포 경로·JS의 HTTP 응답, Supabase 읽기 API와 공개 인증 설정 확인. 로그인·실제 CRUD·인증 메일은 별도 검증 필요 |
+| 배포 | 수정 코드 배포·원격 API 로그인/CRUD 확인 | Vercel 완료 상태와 실제 배포 JavaScript 반영 확인. 브라우저 전체 UI 조작·신규 확인 메일 복귀는 별도 검증 필요 |
 | 보너스: 성능 최적화 | ✅ | `useMemo` (필터 결과), `useCallback` (refetch 메모이제이션) |
 | 보너스: 전역 상태 | ✅ | `AuthContext`의 사용자·세션 확인 상태를 헤더·로그인·프로필·보호 라우트에서 공유 |
 | 보너스: 인증 | ✅ | Supabase 이메일 로그인·회원가입·로그아웃, 보호 라우트와 로그인 후 원래 경로 복귀 |
@@ -124,18 +126,18 @@ useEffect(() => { refetch(); }, [refetch]);          // refetch 불변 → 마�
 | --- | --- | --- | --- |
 | 목록 조회 | `/bookmarks` | `select("*").order("created_at", {ascending:false})` | 카드 목록 렌더, 카테고리 필터 적용 |
 | 상세 조회 | `/bookmarks/:id` | `select("*").eq("id", id).maybeSingle()` | 제목/URL/메모/등록일 표시 |
-| 등록 | `/bookmarks/new` → 폼 제출 | `insert(values).select().single()` | 새 레코드 상세 페이지로 이동 |
+| 등록 | `/bookmarks/new` → 폼 제출 | `insert(payload).select().single()` | 새 레코드 상세 페이지로 이동 |
 | 수정 | `/bookmarks/:id/edit` → 폼 제출 | `update(values).eq("id", id).select("id").maybeSingle()` | 변경된 행 확인 후 해당 상세 페이지로 이동 |
 | 삭제 | `/bookmarks/:id` → 삭제 버튼 | `delete().eq("id", id).select("id").maybeSingle()` | 삭제된 행 확인 후 목록 페이지로 이동 |
 
-등록·수정·삭제는 로그인 세션을 확인한다. 수정·삭제 결과가 0행이면 성공으로 이동하지 않고 실패를 표시한다. 원격 DB에서도 같은 제한이 적용되려면 아래 SQL 권한 정책을 실제 Supabase 프로젝트에 적용해야 한다.
+등록·수정·삭제는 로그인 세션을 확인한다. 등록 `payload`에는 폼의 `title`, `url`, `memo`, `category`만 선택하고 `user_id`는 확인한 세션 사용자의 ID로 채운다. `user_id`는 작성자 메타데이터이며 소유자만 수정·삭제하도록 제한하는 정책은 아니다. 수정·삭제 결과가 0행이면 성공으로 이동하지 않고 실패를 표시한다. 원격 DB에서도 같은 제한이 적용되려면 아래 복구·권한 SQL을 실제 Supabase 프로젝트에 적용해야 한다.
 
 ### CRUD 실패 케이스 처리
 
 | 실패 유형 | 원인 | UI 동작 |
 | --- | --- | --- |
 | 목록·상세 조회 실패 | 네트워크 오류, Supabase 서비스 장애 | `error` state 설정 → `ErrorState` 렌더 ("요청에 실패했습니다.") + 재시도 버튼 |
-| 등록 실패 | 필수 컬럼 누락, RLS 정책 거부 | `submitError` state 설정 → 폼 상단에 에러 메시지 표시, 폼 유지 |
+| 등록 실패 | 필수 컬럼 누락, RLS 정책 거부 | DB 오류 코드와 누락 컬럼 등 필요한 원인을 안내하고 폼 유지. 원본 행·토큰 등 상세값은 표시하지 않음 |
 | 수정 실패 | 존재하지 않는 id, RLS 정책 거부 | `submitError` state 설정 → 폼 상단 에러 표시, 현재 페이지 유지 |
 | 삭제 실패 | 존재하지 않는 id, 네트워크 오류 | `deleteError` state 설정 → 삭제 버튼 위에 에러 메시지 표시, 페이지 유지 |
 | 존재하지 않는 id 조회 | `.maybeSingle()` 결과 `null` | `!bookmark` 분기 → `ErrorState` ("해당 북마크를 찾을 수 없습니다.") |
@@ -203,7 +205,7 @@ URL 검증은 `lib/bookmarkUrl.js`에서 공통 처리한다. 이전에 저장�
 
 **연동 중 겪은 어려움**: `useEffect` + `useCallback` 의존성 배열 설정 실수로 무한 루프 발생. `refetch`를 `useCallback` 없이 의존성에 넣으면 렌더마다 새 함수 참조가 생겨 effect가 계속 재실행된다. `useCallback([])` / `useCallback([id])`로 메모이제이션해 해결했다.
 
-**인증과 권한**: 선택 과제인 Supabase Auth와 사용자 Context를 추가했다. 누구나 목록·상세를 조회하고 로그인 사용자만 등록·수정·삭제한다. `ProtectedRoute`가 등록·수정·프로필 경로를 보호하고, 페이지의 쓰기 처리와 DB의 RLS 정책이 각각 세션과 데이터 권한을 확인한다. 작성자별 소유권을 구분하지 않으므로 로그인 사용자는 모든 북마크를 수정·삭제할 수 있다.
+**인증과 권한**: 선택 과제인 Supabase Auth와 사용자 Context를 추가했다. 목표 정책은 공개 조회·로그인 사용자 등록/수정/삭제다. `ProtectedRoute`가 등록·수정·프로필 경로를 보호하고, 페이지의 쓰기 처리와 DB의 RLS 정책이 각각 세션과 데이터 권한을 확인한다. 등록 시 `user_id`에 작성자 ID를 기록하지만, 작성자별 소유권 제한은 두지 않아 로그인 사용자는 모든 북마크를 수정·삭제할 수 있다. 이 정책은 SQL을 실제 DB에 적용해야 반영된다.
 
 **연동 중 겪은 주요 에러와 해결:**
 
@@ -212,6 +214,7 @@ URL 검증은 `lib/bookmarkUrl.js`에서 공통 처리한다. 이전에 저장�
 | `useEffect` 무한 루프 | `refetch`를 `useCallback` 없이 의존성에 넣어 렌더마다 새 참조 생성 | `useCallback([])` / `useCallback([id])`로 메모이제이션 |
 | `.single()` 에러 | 없는 id 조회 시 단건이 아니라는 에러 발생 | `.maybeSingle()`로 교체 — 없으면 `null` 반환 |
 | 환경변수 누락으로 앱 흰 화면 | 이전 구현은 `.env` 없이 실행 시 모듈 초기화에서 예외 발생 | 현재는 설정 안내 화면을 표시하고 `.env.example`과 배포 환경변수 등록으로 안내 |
+| 원격 조회 `42703`: `column bookmarks.memo does not exist` | 기존 테이블에 `memo`가 없었다. `CREATE TABLE IF NOT EXISTS`는 이미 있는 테이블에 컬럼을 추가하지 않으며 `category`·`user_id`만 추가해도 앱 계약이 완성되지 않음 | 읽기 전용 진단 SQL로 구조를 확인한 뒤 갱신한 `schema.sql` 전체 실행. 앱은 확인한 작성자 ID를 등록 payload에 포함하고 DB 오류 원인을 안내 |
 
 상세 내용(RLS 정책, useEffect 패턴, 버전) → [docs/tech.md](./docs/tech.md)
 
@@ -243,7 +246,8 @@ src/
 │   ├── supabase.js          # Supabase 클라이언트 싱글턴
 │   ├── constants.js         # 카테고리 상수
 │   ├── authRedirect.js      # 로그인 복귀 경로·가입 메일 주소 검증
-│   └── bookmarkUrl.js       # HTTP/HTTPS URL 검증
+│   ├── bookmarkUrl.js       # HTTP/HTTPS URL 검증
+│   └── bookmarkErrors.js    # DB 오류 코드·알려진 컬럼만 안내
 ├── hooks/
 │   ├── useBookmarks.js      # 목록 조회 (loading/error/refetch)
 │   ├── useBookmark.js       # 단건 조회 (loading/error/refetch)
@@ -409,11 +413,17 @@ VITE_SUPABASE_ANON_KEY=your-project-public-key
 VITE_APP_URL=http://localhost:5173
 ```
 
-Supabase에 새 테이블을 만들 때는 [schema.sql](./schema.sql)을 SQL Editor에서 실행한다. 기존 `bookmarks` 테이블의 익명 쓰기를 로그인 사용자 쓰기로 전환할 때는 [supabase/policies-authenticated-writes.sql](./supabase/policies-authenticated-writes.sql)의 안내대로 현재 정책을 보관한 뒤 적용한다. SQL 파일을 저장한 것만으로 원격 DB가 변경되지는 않는다.
+Supabase 테이블은 다음 순서로 준비한다. 이번 환경은 사용자가 전체 `schema.sql`을 실행해 누락 컬럼·기본값·공유 쓰기 권한을 보완했고, 이후 평가 계정의 API 로그인·등록·조회·수정·삭제를 모두 확인했다. 다음 절차는 새 환경이나 기존 테이블을 같은 계약에 맞출 때 사용한다.
+
+1. SQL Editor에서 [supabase/diagnose-bookmarks.sql](./supabase/diagnose-bookmarks.sql)을 실행해 현재 컬럼·기본값·정책·테이블 권한 결과를 보관한다. 이 파일은 읽기 전용이다.
+2. 신규 환경을 만들거나 기본값·공유 쓰기 권한까지 이 앱의 계약에 맞출 때는 [schema.sql](./schema.sql) 전체를 한 번 실행한다. 새 테이블 생성뿐 아니라 기존 테이블의 누락된 `memo`, `category`, `user_id`, `created_at`과 기본값을 보완하고, 공개 조회·로그인 사용자 쓰기 정책 및 API 스키마 새로고침까지 적용한다.
+3. 진단 SQL을 다시 실행해 필요한 컬럼·기본값·정책 4개를 확인한 뒤 앱에서 등록·조회·수정·삭제를 재검증한다.
+
+`schema.sql` 전체에는 권한 전환이 포함되어 있어 [policies-authenticated-writes.sql](./supabase/policies-authenticated-writes.sql)을 추가로 실행할 필요가 없다. 이 별도 파일은 컬럼이 이미 맞고 권한만 전환할 때 사용할 수 있다. 기존 컬럼의 타입·NOT NULL 제약·저장값은 임의로 변경하지 않으며, 기존 작성자 ID도 덮어쓰지 않는다. SQL 파일을 저장한 것만으로 원격 DB가 바뀌지는 않는다. 전체 기본값·권한 보완을 적용하려면 사용자가 SQL Editor에서 실행한다.
 
 가입 확인 메일의 복귀 주소는 `VITE_APP_URL` 또는 현재 origin에 `/login?redirect=...`를 붙여 만든다. `VITE_APP_URL`을 사용한다면 이 앱의 주소로 설정한다. 기존 B1-2와 Supabase 프로젝트를 공유할 때는 **Authentication → URL Configuration**의 기존 Site URL·허용 주소를 유지하고, Redirect URLs에 `https://b1-2-simple.vercel.app/**`를 추가한다. 로컬 인증도 사용할 때는 `http://localhost:5173/**`를 별도로 허용한다. 현재 공개 인증 설정은 이메일 로그인·회원가입이 가능하고 이메일 확인이 필요한 상태다. 실제 새 확인 메일의 링크가 이 앱으로 돌아오는지 추가로 확인해야 한다.
 
-배포 시 Vercel에도 같은 공개 환경변수를 등록하고 다시 빌드한다. 목록·상세는 비로그인 상태에서 확인하고, 등록·수정·삭제·프로필은 테스트용 계정으로 로그인해 확인한다. 현재 저장소에는 실제 `.env` 값이 포함되어 있지 않으며, 이번 변경에서 원격 DB 정책 적용이나 배포된 인증 CRUD를 수행하지 않았다.
+새로 배포할 때는 Vercel에도 같은 공개 환경변수를 등록하고 다시 빌드한다. 현재 저장소에는 실제 `.env` 값이 포함되어 있지 않다. 이번 환경은 사용자 SQL 적용과 평가 계정의 원격 API 로그인·CRUD 검증을 완료했으며, 브라우저에서의 전체 UI 조작과 신규 가입 확인 메일 복귀는 별도로 확인한다.
 
 ### 검사 명령
 
@@ -425,7 +435,7 @@ npm run build
 
 자동 테스트는 Supabase 응답을 대체해 인증 상태·보호 라우트·오류 처리를 확인한다. 실제 이메일 수신과 원격 RLS·배포 CRUD 확인은 별도로 필요하다.
 
-2026-11-10 로컬 검증: `npm run build`, `npm run lint`, `npm test` 모두 통과했다. 테스트는 7개 파일의 51개 항목이며 인증·권한·URL 검증·조회 응답 경합을 포함한다. 갱신한 잠금 파일은 `npm ci --dry-run --offline`으로 일관성을 확인했다.
+2026-11-10 로컬 검증: `npm run build`, `npm run lint`, `npm test` 모두 통과했다. 테스트는 8개 파일의 62개 항목이며 인증·권한·URL 검증·조회 응답 경합과 누락 컬럼 오류·작성자 ID 전달·안전한 오류 안내를 포함한다. 갱신한 잠금 파일은 `npm ci --dry-run --offline`으로 일관성을 확인했다.
 
 ### 현재 배포 확인 범위
 
@@ -434,13 +444,17 @@ npm run build
 | 확인 대상 | 결과와 의미 |
 | --- | --- |
 | 사용자 제공 홈 화면 | Bookmark Keeper 홈·로그인 메뉴·공개 조회/로그인 쓰기 안내 확인 |
-| 사용자 제공 회원가입·로그인 화면 | 회원가입 입력과 가입 요청 후 이메일 확인 안내 화면 확인. 이메일 확인·로그인 성공은 미검증 |
+| 사용자 제공 회원가입·로그인 화면 | 회원가입 입력과 가입 요청 후 이메일 확인 안내 화면 확인 |
 | 홈과 배포 JavaScript | HTTP 200 응답 확인 |
+| 등록 오류 수정 코드 배포 | 커밋 `18f603e`의 Vercel 완료 상태와 실제 프로덕션 JavaScript의 새 오류 안내 코드 반영 확인 |
 | `/bookmarks`, `/login`, `/bookmarks/new`, `/profile`, `/not-a-real-page` | HTTP 200과 React 앱 HTML 응답 확인. SPA rewrite의 HTTP 응답 확인이며, 각 화면의 렌더링·로그인 차단을 브라우저에서 검증한 것은 아님 |
-| Supabase `GET /rest/v1/bookmarks?select=id&limit=0` | HTTP 200. 데이터를 가져오거나 변경하지 않는 요청으로 테이블 읽기 API 접근성 확인 |
+| Supabase `GET /rest/v1/bookmarks?select=id&limit=0` | 이전 검사에서 HTTP 200. `id` 읽기 API 접근성만 확인하며 앱 전체 컬럼·등록 정상 여부를 검증한 결과가 아님 |
+| 앱 사용 컬럼의 추가 API 검사 | 처음에는 `42703`: `column bookmarks.memo does not exist`. 사용자가 `memo` 추가·API 스키마 새로고침 후 `id,title,url,memo,category,user_id,created_at` 전체 및 개별 컬럼 조회 HTTP 200 확인 |
 | Supabase `GET /auth/v1/settings` | HTTP 200. 이메일 인증 활성화, 회원가입 허용, 이메일 확인 필요 설정 확인 |
+| 평가 계정의 API 로그인·등록·단건 조회 | 로그인 성공. 세션 사용자의 `user_id`를 포함한 임시 북마크 생성 HTTP 201·단건 조회 HTTP 200 확인 |
+| 전체 SQL 적용 후 원격 API CRUD | 사용자의 `schema.sql` 전체 실행 후 새 임시 북마크 등록 HTTP 201·조회 HTTP 200·수정 HTTP 200·삭제 HTTP 200과 실제 반환 행 확인 |
 
-실제 목록·상세 데이터 표시, 로그인 성공·가입 계정의 이메일 확인·로그아웃, 확인 메일 수신과 이 앱으로의 복귀, 원격 DB 정책 원문·쓰기 권한, 등록·수정·삭제는 아직 검증하지 않았다. 읽기 전용 검사에서는 원격 쓰기나 메일 발송을 실행하지 않았으며, 공개 연결값을 파일이나 검사 로그에 저장하지 않았다.
+원격 `memo` 누락과 수정·삭제 반환 0행 문제는 사용자 SQL 적용 후 해소되었다. 이전 검사에서 남았던 임시 북마크와 새 CRUD 검사 행을 모두 삭제했고, API 검증용 로그인 세션도 정리했다. 실제 사용자 식별값·토큰·공개 연결값은 문서에 기록하지 않았다. 위 API 검증은 브라우저에서의 전체 UI 사용 흐름이나 신규 가입 확인 메일의 수신·복귀를 검증한 결과는 아니다.
 
 ### `useAuth()` — 사용자 상태 공유
 

@@ -1,6 +1,8 @@
 # 기술 스택
 
-2026-11-10 인증·사용자 Context 추가를 반영했다. 실제 원격 DB 권한 정책 적용과 배포 인증 CRUD는 별도 검증이 필요하다.
+2026-11-10 인증·사용자 Context 추가와 기존 원격 테이블 복구를 반영했다. 사용자가 전체 `schema.sql`을 적용한 뒤 평가 계정의 API 로그인·등록·조회·수정·삭제를 모두 통과했다. 검사 행과 검증용 세션은 정리했으며, 브라우저의 전체 UI 조작과 신규 가입 확인 메일의 수신·복귀는 별도 검증이 필요하다.
+
+등록 오류 수정 커밋 `18f603e`의 Vercel 배포 완료 상태와 실제 프로덕션 JavaScript에 새 오류 안내 코드가 포함된 것을 확인했다.
 
 ## 런타임 · 언어
 
@@ -34,10 +36,25 @@
 | `memo` | `text` | nullable |
 | `category` | `text` | NOT NULL, 기본값 `'etc'` |
 | `created_at` | `timestamptz` | NOT NULL, `now()` 기본값 |
+| `user_id` | `uuid` | 새 테이블에서는 nullable, `auth.uid()` 기본값·`auth.users(id)` 참조 |
 
-목표 RLS 정책은 `anon`·`authenticated` 공개 조회, `authenticated` 등록·수정·삭제다. `schema.sql`은 신규 테이블과 정책, `supabase/policies-authenticated-writes.sql`은 기존 `bookmarks` 테이블의 정책 전환을 위한 SQL이다. 기존의 익명 전체 허용 정책이 남으면 새 제한과 OR로 결합되어 익명 쓰기가 계속 허용될 수 있으므로, 안내에 따라 기존 정책을 확인·보관하고 전환해야 한다.
+표는 신규 테이블 기준이다. 기존 ID의 타입·기본키·자동 증가 설정은 유지하며, UUID ID에 기본값만 빠진 경우 `gen_random_uuid()` 기본값을 보완한다. 숫자형 ID의 자동 증가 설정 누락은 진단 결과에 따라 별도 확인해야 한다.
 
-개인별 작성자 소유권은 구분하지 않는다. 로그인 사용자는 모든 북마크를 수정·삭제할 수 있다. 코드에 SQL을 추가한 것과 원격 DB에 실행한 것은 별개이며, 이번 변경에서 실제 원격 정책 적용은 수행하지 않았다.
+`user_id`는 작성자 메타데이터다. 앱은 등록 직전 세션을 확인한 사용자의 ID를 payload에 포함하고, DB는 미지정 INSERT의 기본값으로 `auth.uid()`를 사용한다. 이 컬럼을 추가하는 것만으로 작성자별 접근 제한이 생기지는 않는다. 기존 `user_id`의 저장값·제약은 유지한다.
+
+RLS 정책은 `anon`·`authenticated` 공개 조회, `authenticated` 등록·수정·삭제다. 개인별 소유권은 구분하지 않으므로 로그인 사용자는 모든 북마크를 수정·삭제할 수 있다. 기존 허용 정책이 남으면 새 제한과 OR로 결합될 수 있어, 기존 정책을 보관한 뒤 이 계약의 4개 정책으로 전환한다. 이번 환경에서는 사용자가 전체 `schema.sql`을 실행했고 이후 평가 계정의 API CRUD를 검증했다.
+
+### 기존 테이블 복구
+
+원격 API의 추가 컬럼 검사에서 `42703`, `column bookmarks.memo does not exist`를 확인했다. `CREATE TABLE IF NOT EXISTS`는 이미 있는 테이블을 수정하지 않으므로, `category`와 `user_id`만 추가하면 `memo` 누락이 남는다. 앞선 `select=id&limit=0`의 HTTP 200은 ID 읽기 API 접근성만 확인한 것이며 전체 컬럼이나 등록 정상 여부의 근거가 아니다.
+
+이후 사용자가 `memo` 추가와 API 스키마 새로고침을 실행해 앱 사용 컬럼 7개의 조회와 등록·단건 조회가 통과했다. 당시 수정·삭제는 반환 0행이었으나, 사용자가 전체 `schema.sql`을 적용한 후 API 로그인·새 임시 북마크 생성 HTTP 201·조회 HTTP 200·수정 HTTP 200·삭제 HTTP 200과 실제 반환 행을 모두 확인했다. 이전에 남은 임시 행과 새 검사 행은 모두 삭제했고 검증용 로그인 세션도 정리했다.
+
+신규 환경을 만들거나 전체 기본값·공유 권한까지 보완할 때는 먼저 `supabase/diagnose-bookmarks.sql`로 실제 컬럼·타입·기본값·정책·GRANT를 조회해 보관한다. 그 다음 `schema.sql` 전체를 한 번 실행하면 신규 테이블 생성 또는 기존 테이블의 누락된 `memo`, `category`, `user_id`, `created_at` 추가와 기본값·공유 권한·API 스키마 새로고침을 함께 처리한다. 권한 전환 SQL을 추가로 실행할 필요는 없고, `supabase/policies-authenticated-writes.sql`은 컬럼이 이미 맞아 권한만 전환할 때 사용할 수 있다.
+
+기존 컬럼의 타입·NOT NULL·저장값·기본키는 변경하지 않는다. 누락된 `category`·`created_at`을 새로 추가할 때는 기본값 `'etc'`·현재 시각이 기존 행에도 채워질 수 있다. 기존 `user_id` 값은 덮어쓰지 않으며, 이후 값이 생략된 INSERT를 위한 기본값을 보완한다. 복구 후 진단 결과와 실제 CRUD를 다시 확인해야 한다.
+
+등록 요청은 폼의 `title`, `url`, `memo`, `category`만 선택하고 작성자 ID를 세션에서 채운다. `bookmarkErrors.js`는 누락 컬럼·필수값·권한·참조·CHECK 오류를 코드별로 안내한다. DB 코드와 미리 정한 컬럼 이름만 출력하며, DB의 원본 `message`·`details`·행 데이터·토큰을 그대로 보여주지 않는다.
 
 ### 인증과 화면 접근
 
