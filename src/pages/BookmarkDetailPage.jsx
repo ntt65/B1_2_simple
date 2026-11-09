@@ -8,6 +8,7 @@ import { ErrorState } from "../components/ErrorState";
 import { Button } from "../components/Button";
 import { supabase, requireAuthenticatedUser } from "../lib/supabase";
 import { getSafeBookmarkUrl } from "../lib/bookmarkUrl";
+import { getBookmarkErrorMessage } from "../lib/bookmarkErrors";
 
 export function BookmarkDetailPage() {
   const { id } = useParams();
@@ -27,8 +28,8 @@ export function BookmarkDetailPage() {
       if (requestError) throw requestError;
       if (!data) throw new Error("삭제할 북마크가 없거나 삭제 권한이 없습니다.");
       navigate("/bookmarks", { state: { notice: "북마크를 삭제했습니다." } });
-    } catch {
-      setDeleteError("삭제에 실패했습니다. 북마크의 존재 여부와 로그인 상태를 확인해주세요.");
+    } catch (error) {
+      setDeleteError(getBookmarkErrorMessage(error, "삭제"));
     } finally {
       setDeleting(false);
     }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { BookmarkForm } from "../components/BookmarkForm";
 import { supabase, requireAuthenticatedUser } from "../lib/supabase";
+import { getBookmarkErrorMessage } from "../lib/bookmarkErrors";
 
 export function BookmarkNewPage() {
   const navigate = useNavigate();
@@ -10,13 +11,19 @@ export function BookmarkNewPage() {
   async function handleCreate(values) {
     setSubmitError(null);
     try {
-      await requireAuthenticatedUser();
-      const { data, error } = await supabase.from("bookmarks").insert(values).select().single();
+      const user = await requireAuthenticatedUser();
+      const { data, error } = await supabase.from("bookmarks").insert({
+        title: values.title,
+        url: values.url,
+        memo: values.memo,
+        category: values.category,
+        user_id: user.id,
+      }).select().single();
       if (error) throw error;
       if (!data) throw new Error("등록 결과를 확인할 수 없습니다.");
       navigate(`/bookmarks/${data.id}`, { state: { notice: "북마크를 등록했습니다." } });
-    } catch {
-      setSubmitError("등록에 실패했습니다. 로그인 상태와 연결을 확인한 뒤 다시 시도하세요.");
+    } catch (error) {
+      setSubmitError(getBookmarkErrorMessage(error, "등록"));
     }
   }
   return (

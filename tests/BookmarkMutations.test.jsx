@@ -156,4 +156,51 @@ describe("bookmark writes with authentication and row verification", () => {
     expect(mocks.from).not.toHaveBeenCalled();
     expect(screen.queryByTestId("destination")).not.toBeInTheDocument();
   });
+
+  it.each([
+    [{ code: "23502", message: 'null value in column "user_id" of relation "bookmarks" violates not-null constraint', details: "Failing row contains (confidential-row-value)." }, /사용자|user_id/],
+    [{ code: "23502", message: 'null value in column "category" of relation "bookmarks" violates not-null constraint' }, /카테고리|category/],
+    [{ code: "42501", message: 'new row violates row-level security policy for table "bookmarks"' }, /권한|정책/],
+    [{ code: "PGRST204", message: "Could not find the 'memo' column of 'bookmarks' in the schema cache" }, /memo/],
+    [{ code: "42703", message: "column bookmarks.memo does not exist" }, /memo/],
+    [{ code: "23503", message: 'insert or update on table "bookmarks" violates foreign key constraint "bookmarks_user_id_fkey"', details: 'Key (user_id)=(user-1) is not present in table "users".' }, /사용자|user_id/],
+    [{ code: "23514", message: 'new row for relation "bookmarks" violates check constraint "bookmarks_category_check"' }, /카테고리|category/],
+  ])("identifies a database creation error and keeps the entered form: $code / $message", async (error, explanation) => {
+    mocks.single.mockResolvedValueOnce({ data: null, error });
+    renderPage(<BookmarkNewPage />, "/bookmarks/new", "/bookmarks/new");
+    fireEvent.change(screen.getByLabelText("제목"), { target: { value: "Bookmark to keep" } });
+    fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://react.dev" } });
+    fireEvent.change(screen.getByLabelText("메모"), { target: { value: "Do not discard this note" } });
+    fireEvent.click(screen.getByRole("button", { name: "등록", exact: true }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(error.code);
+    expect(alert).toHaveTextContent(explanation);
+    expect(alert).not.toHaveTextContent("confidential-row-value");
+    expect(screen.getByLabelText("제목")).toHaveValue("Bookmark to keep");
+    expect(screen.getByLabelText("URL")).toHaveValue("https://react.dev");
+    expect(screen.getByLabelText("메모")).toHaveValue("Do not discard this note");
+    expect(screen.getByRole("button", { name: "등록", exact: true })).toBeEnabled();
+    expect(screen.queryByTestId("destination")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["a network error", new Error("Unrelated internal error: do not display this message"), null],
+    ["an unknown safe database code", { code: "XX000", message: "Unrelated internal error: do not display this message" }, "XX000"],
+    ["an unsafe database code", { code: "XX000<script>", message: "Unrelated internal error: do not display this message" }, null],
+  ])("keeps input and exposes only safe diagnostics for %s", async (_label, error, visibleCode) => {
+    mocks.single.mockRejectedValueOnce(error);
+    renderPage(<BookmarkNewPage />, "/bookmarks/new", "/bookmarks/new");
+    fireEvent.change(screen.getByLabelText("제목"), { target: { value: "Network retry bookmark" } });
+    fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://react.dev" } });
+    fireEvent.click(screen.getByRole("button", { name: "등록", exact: true }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("등록에 실패했습니다.");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Unrelated internal error");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("<script>");
+    if (visibleCode) expect(screen.getByRole("alert")).toHaveTextContent(visibleCode);
+    expect(screen.getByLabelText("제목")).toHaveValue("Network retry bookmark");
+    expect(screen.getByRole("button", { name: "등록", exact: true })).toBeEnabled();
+    expect(screen.queryByTestId("destination")).not.toBeInTheDocument();
+  });
 });

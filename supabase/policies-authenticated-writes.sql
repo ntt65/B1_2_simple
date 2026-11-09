@@ -1,10 +1,12 @@
 -- 공개 조회 + 로그인 사용자 쓰기. 로그인 사용자는 모든 북마크를 수정·삭제할 수 있습니다.
+-- 누락 컬럼·기본값도 복구해야 한다면 이 파일 대신 루트 schema.sql 전체를 실행하세요.
 -- Supabase SQL Editor에서 실행하세요. 사용자별 비공개 소유권 정책은 포함하지 않습니다.
 -- 실행 전 기존 정책을 보관하세요:
 -- select * from pg_policies where schemaname = 'public' and tablename = 'bookmarks';
 begin;
 
 alter table public.bookmarks enable row level security;
+grant usage on schema public to anon, authenticated;
 revoke insert, update, delete on table public.bookmarks from anon;
 grant select on table public.bookmarks to anon, authenticated;
 grant insert, update, delete on table public.bookmarks to authenticated;
@@ -20,7 +22,7 @@ begin
   loop
     execute format('drop policy if exists %I on public.bookmarks', policy_row.policyname);
   end loop;
-end
+end;
 $$;
 
 create policy "bookmarks_public_read"

@@ -6,6 +6,7 @@ import { BookmarkForm } from "../components/BookmarkForm";
 import { Loading } from "../components/Loading";
 import { ErrorState } from "../components/ErrorState";
 import { supabase, requireAuthenticatedUser } from "../lib/supabase";
+import { getBookmarkErrorMessage } from "../lib/bookmarkErrors";
 
 export function BookmarkEditPage() {
   const { id } = useParams();
@@ -22,8 +23,8 @@ export function BookmarkEditPage() {
       // RLS 거부나 다른 사용자의 삭제로 변경된 행이 없을 수도 있다.
       if (!data) throw new Error("수정할 북마크가 없거나 수정 권한이 없습니다.");
       navigate(`/bookmarks/${id}`, { state: { notice: "북마크를 수정했습니다." } });
-    } catch {
-      setSubmitError("수정에 실패했습니다. 북마크의 존재 여부와 로그인 상태를 확인해주세요.");
+    } catch (error) {
+      setSubmitError(getBookmarkErrorMessage(error, "수정"));
     }
   }
   if (loading) return <Loading message="북마크를 불러오는 중..." />;
