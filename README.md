@@ -5,6 +5,7 @@ React + Supabase로 구현한 북마크 관리 SPA. 읽고 싶은 링크를 카�
 - **현재 배포 URL**: https://b1-2-simple.vercel.app
 - **소스 코드**: https://github.com/ntt65/B1_2_simple
 - **참고 구현**: https://github.com/ntt65/B1-2
+- **설정 바로가기**: [Vercel과 Supabase 연동 및 배포 가이드](#vercel과-supabase-연동-및-배포-완벽-가이드) · [로컬 실행 방법](#로컬-실행-방법)
 
 2026-11-10에 미구현 보너스였던 사용자 Context와 Supabase Auth를 추가했다. 현재 문서의 구현 설명은 이 변경을 반영한다. 아래의 과거 실행·배포 기록은 인증 추가 전 기록이며, 이번 변경의 실제 원격 DB 적용·배포 CRUD 검증 결과를 뜻하지 않는다.
 
@@ -389,6 +390,230 @@ URL 파라미터 `id`가 바뀌면 자동으로 재조회한다 (`useCallback([i
 | 같은 id로 재렌더 | `refetch` 참조 유지 → `useEffect` 재실행 안 함 |
 | 다른 id로 이동 | `useCallback([id])`가 새 함수 생성 → `refetch` 참조 변경 → `useEffect` 재실행 → 새 id로 재조회 |
 | 에러 후 재시도 | `ErrorState`의 `onRetry` → `refetch()` 직접 호출 → `loading` 초기화 후 재조회 |
+
+---
+
+## Vercel과 Supabase 연동 및 배포 완벽 가이드
+
+이 가이드는 현재 Bookmark Keeper의 **공개 조회 + 로그인 사용자 전체 쓰기** 구조를 기준으로 한다. `user_id`는 작성자 기록이며, 로그인 사용자는 다른 사용자가 등록한 북마크도 수정·삭제할 수 있다. SQL의 기준 파일은 [schema.sql](./schema.sql)이고, 기존 환경의 구조를 읽는 파일은 [diagnose-bookmarks.sql](./supabase/diagnose-bookmarks.sql)이다.
+
+### 1. 기본 설정
+
+**환경변수와 배포 대상**
+
+Supabase 프로젝트의 **Connect** 화면에서 Project URL과 Publishable key를 확인한다. 키 관리는 **Settings → API Keys**에서 확인할 수 있다. 이미 사용하는 legacy `anon` 공개 키도 이 앱에서 사용할 수 있다. ([Supabase API 키 안내](https://supabase.com/docs/guides/getting-started/api-keys))
+
+| 변수 | 필수 여부 | 이 프로젝트에서의 값과 역할 |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | 필수 | 사용할 Supabase 프로젝트의 `https://...supabase.co` 주소 |
+| `VITE_SUPABASE_ANON_KEY` | 필수 | 같은 프로젝트의 Publishable key 또는 legacy anon key. 코드 변수명은 그대로 사용하며 `sb_publishable_...` 값도 입력 가능 |
+| `VITE_APP_URL` | 선택 | 가입 확인 메일이 돌아올 앱의 origin. Production 예시는 `https://b1-2-simple.vercel.app`이며, 생략하면 현재 접속 origin 사용 |
+
+```dotenv
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-publishable-or-anon-key
+# Production에서 복귀 주소를 고정할 때만 설정
+VITE_APP_URL=https://b1-2-simple.vercel.app
+```
+
+로컬에서는 `.env.example`을 `.env`로 복사한다. `VITE_` 변수는 Vite가 브라우저 코드에 포함하므로 서비스 역할 키나 계정 비밀번호를 넣지 않는다. 로컬 값을 바꿨다면 개발 서버를 재시작한다. ([Vite 환경변수 안내](https://vite.dev/guide/env-and-mode))
+
+Vercel 프로젝트의 **Settings → Environment Variables**에서는 실제로 사용할 환경만 선택한다. Production은 운영 주소용, Preview는 필요한 미리보기 배포용으로 설정한다. Development 설정은 로컬 Vercel 도구를 사용할 때 필요한 범위로 선택하며, 일반 `npm run dev`는 로컬 `.env`를 사용한다. 모든 환경에 같은 값을 일괄 등록할 필요는 없다.
+
+Vercel 환경변수를 바꿔도 기존 배포에는 반영되지 않는다. 대상 환경에 다시 배포하고, 수정한 커밋이 배포되었는지 확인한다. 이 프로젝트의 빌드 명령은 `npm run build`, 출력 폴더는 `dist`다. ([Vercel 환경변수 변경 안내](https://vercel.com/docs/environment-variables/managing-environment-variables))
+
+**Vercel 프로젝트 생성·재배포 순서**
+
+1. Vercel Dashboard에서 **Add New → Project**를 선택하고 이 GitHub 저장소를 Import한다.
+2. **Framework Preset: Vite**, **Root Directory: `./`**, **Build Command: `npm run build`**, **Output Directory: `dist`**를 확인한다. 이 저장소는 하위 폴더가 아닌 루트에 앱이 있다.
+3. 사용할 Supabase 공개 환경변수를 입력하고 **Deploy**로 첫 배포를 만든다.
+
+기존 프로젝트의 값을 바꿀 때는 **Settings → Environment Variables → 변수 수정·적용 환경 선택 → Save** 순서로 저장한다. 이어서 **Deployments → 대상 환경의 최신 배포 → `...` → Redeploy**로 다시 배포한다. Production 설정을 바꿨다면 Production 배포를 선택하고, 완료 뒤 실제 운영 주소에서 확인한다.
+
+**Supabase 인증 URL**
+
+이 앱은 기존 B1-2와 Supabase 프로젝트를 공유하므로 **Authentication → URL Configuration**의 기존 Site URL과 기존 앱의 허용 주소를 유지한다. **Redirect URLs**에 이 앱의 주소를 추가한다.
+
+```text
+https://b1-2-simple.vercel.app/**
+http://localhost:5173/**
+```
+
+로컬 인증을 쓰지 않으면 localhost 항목은 필요 없다. Preview 인증을 테스트할 때는 소유한 **해당 Preview 배포 주소만** 추가한다. 모든 Vercel 사이트를 허용하는 전역 와일드카드는 사용하지 않는다. 운영에서는 가능한 한 정확한 복귀 경로를 허용하되, 현재 코드가 `/login?redirect=...`처럼 동적 쿼리를 붙이므로 위 예시는 이 앱의 호스트 범위에서 허용한다. ([Supabase Redirect URL 안내](https://supabase.com/docs/guides/auth/redirect-urls))
+
+새 Supabase 프로젝트를 단독 앱용으로 만드는 경우에만 그 앱의 Production origin을 Site URL로 설정한다. 공유 프로젝트의 Site URL을 새 앱 주소로 바꾸면 기존 앱의 기본 복귀 주소에도 영향을 준다.
+
+`authRedirect.js`는 `VITE_APP_URL`이 있으면 그 origin을, 없으면 현재 브라우저 origin을 사용해 `/login?redirect=...` 주소를 만든다. Preview 환경에 Production의 `VITE_APP_URL`을 넣으면 확인 메일도 Production으로 돌아온다. Preview로 복귀시킬 목적이라면 해당 Preview origin을 사용하거나 이 선택 변수를 생략하고, 그 주소를 Redirect URLs에 허용한다.
+
+**세션 유지와 페이지 새로고침**
+
+인증 메일의 복귀 주소와 이미 로그인한 브라우저의 세션 복원은 별개의 흐름이다. `AuthProvider`는 저장된 세션을 `getSession()`으로 확인하고 `onAuthStateChange()`로 사용자 상태를 공유한다. 세션을 확인하는 동안 보호 화면은 로딩을 표시하고, 복원 오류는 오류 UI로 보여준다.
+
+Production·Preview·localhost는 origin이 달라 브라우저 저장소와 로그인 상태가 자동으로 공유되지 않는다. 새로고침 후 로그인이 풀린다면 현재 origin, 저장소 사용 가능 여부, 세션 만료·갱신 요청, 초기 세션 확인 오류를 구분해 확인한다. Redirect URL 하나를 바꾸면 세션 유지 문제도 모두 해결된다고 가정하지 않는다.
+
+`vercel.json`의 rewrite는 `/bookmarks/new` 같은 주소로 직접 들어가거나 새로고침할 때 React 앱을 제공한다. 잘못된 경로도 HTTP 200으로 앱 HTML을 받은 뒤 React의 Not Found 화면을 보여줄 수 있으므로, HTTP 응답만으로 화면 동작을 판단하지 않는다.
+
+Vite SPA의 직접 접근·새로고침에서 호스팅 404가 발생하면 저장소 루트의 [vercel.json](./vercel.json)이 아래와 같은지 확인하고 다시 배포한다. 현재 프로젝트에 이미 포함된 설정이다. ([Vercel의 Vite SPA 설정 안내](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas))
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+### 2. 증상별 확인 표
+
+| 증상·오류 | 확인할 내용 | 이 프로젝트의 처리 |
+| --- | --- | --- |
+| `Supabase 연결 설정이 필요합니다` | 대상 배포의 URL·공개 키, URL 형식, 환경변수 변경 후 재배포 여부 | `SetupNotice` 표시 |
+| 로그인 정보 오류·`invalid_credentials` | 이메일·비밀번호, 계정이 생성된 Supabase 프로젝트 | 입력을 유지하고 인증 오류 안내 |
+| `email_not_confirmed` | 가입 확인 메일의 링크를 열었는지 | 이메일 확인 후 로그인 안내 |
+| 가입 요청 안내는 보이지만 메일 확인 여부가 불명확 | 수신함·스팸함, 메일 전송 제한, 새 메일 링크의 실제 복귀 주소 | 요청 안내만으로 이메일 확인·로그인 성공을 단정하지 않음 |
+| 메일 링크가 기존 앱이나 localhost로 돌아감 | 해당 환경의 `VITE_APP_URL`, `emailRedirectTo`, Redirect URLs, 허용되지 않은 주소의 Site URL fallback | 공유 Site URL을 덮어쓰지 않고 새 앱의 복귀 주소 허용 |
+| 새로고침 후 로그인 상태가 달라짐 | 같은 origin인지, 저장된 세션·갱신 요청·복원 오류인지 | `AuthContext`의 로딩·오류·비로그인 상태를 구분 |
+| `42703`·`PGRST204` | 실제 컬럼 존재 여부와 PostgREST 스키마 캐시 | 누락된 알려진 컬럼과 오류 코드 안내 |
+| `23502` | `user_id`, ID, 날짜 등 NOT NULL 컬럼의 payload·기본값 | 등록은 세션 사용자의 `user_id`를 전달. 기존 테이블의 추가 제약도 진단 |
+| `42501`·권한 거부 | 로그인 세션, 스키마 USAGE, 테이블 GRANT, 적용된 RLS 정책 | 권한과 RLS를 함께 확인하도록 안내 |
+| 수정·삭제 HTTP 200인데 결과가 없음 | 대상 행 존재 여부, SELECT·UPDATE·DELETE 권한과 RLS의 행 조건 | 반환 0행은 성공으로 이동하지 않음 |
+| `23503`·`23514` | 사용자 참조 관계 또는 CHECK 제약과 실제 입력값 | 참조·허용 조건 확인 안내. 제약을 무조건 제거하지 않음 |
+| 직접 URL 접근 시 Vercel 404 | rewrite 설정·배포 버전·실제 요청 주소 | React Not Found 화면과 호스팅 404를 구분 |
+
+### 3. SQL 트러블슈팅
+
+**먼저 실패한 요청의 응답을 확인한다**
+
+브라우저에서 **F12 → Network**를 열고 등록을 시도한 뒤, 실패한 **POST `/rest/v1/bookmarks` → Response**를 확인한다. `code`, `message`, `hint`가 있으면 컬럼 누락·필수값·권한 오류 중 어느 문제인지 구분하는 데 사용한다. `hint`가 없거나 NULL일 수도 있다.
+
+다른 사람에게 전달할 때는 오류 코드와 필요한 컬럼 이름만 추린다. Authorization·apikey 헤더, 토큰, 실제 이메일, 요청 payload나 실패한 행이 포함된 `details` 원문을 그대로 공유하지 않는다. 앱의 `bookmarkErrors.js`도 알려진 코드·컬럼만 안내하도록 구성되어 있다.
+
+**먼저 실제 테이블을 읽어 확인한다**
+
+Supabase SQL Editor에서 [읽기 전용 진단 파일](./supabase/diagnose-bookmarks.sql)을 실행해 컬럼·기본값·제약·트리거·RLS·GRANT 결과를 보관한다. 아래는 핵심 조회 예시다. 다른 테이블의 정책과 섞이지 않도록 스키마와 테이블 이름을 함께 제한한다.
+
+```sql
+select column_name, data_type, is_nullable, column_default, is_identity
+from information_schema.columns
+where table_schema = 'public' and table_name = 'bookmarks'
+order by ordinal_position;
+
+select policyname, roles, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public' and tablename = 'bookmarks'
+order by policyname;
+
+select grantee, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public' and table_name = 'bookmarks'
+  and grantee in ('anon', 'authenticated', 'PUBLIC')
+order by grantee, privilege_type;
+```
+
+**누락 컬럼과 기본값을 맞춘다**
+
+이 앱이 사용하는 컬럼은 `id`, `title`, `url`, `memo`, `category`, `user_id`, `created_at`이다. `CREATE TABLE IF NOT EXISTS`는 기존 테이블의 누락 컬럼을 추가하지 않는다. 이 프로젝트에서도 `category`·`user_id`만 보완한 기존 테이블에 `memo`가 빠져 실제 API에서 `42703`이 발생했다.
+
+`memo` 하나만 빠졌다고 확인한 경우의 최소 수정 예시는 다음과 같다. 이 예시만으로 기본값이나 전체 권한까지 맞춰지는 것은 아니다.
+
+```sql
+alter table public.bookmarks add column if not exists memo text;
+notify pgrst, 'reload schema';
+```
+
+신규 테이블 생성이나 전체 계약 복구에는 [schema.sql 전체](./schema.sql)를 사용한다. 이 파일은 누락 컬럼과 기본값, 공유 권한, API 스키마 새로고침을 한 번에 처리한다. 신규 `user_id` 정의는 다음과 같으며, 계정 삭제 시 북마크 행을 연쇄 삭제하지 않는다.
+
+```sql
+user_id uuid default auth.uid()
+  references auth.users(id) on delete set null
+```
+
+위 구문은 컬럼 정의를 설명한 조각이며 단독 실행 SQL은 아니다. 기존 컬럼이 있으면 `ADD COLUMN IF NOT EXISTS`로 타입·NOT NULL·참조 제약이 바뀌지 않는다. 현재 `schema.sql`은 `category`, `user_id`, `created_at`의 기본값을 별도 ALTER로 보완하지만 기존 작성자 값이나 NULL을 임의로 채우지 않는다. 앱도 등록 직전 확인한 세션의 사용자 ID를 payload에 넣는다. SQL Editor에는 일반 사용자 JWT가 없을 수 있으므로 그곳에서 `auth.uid()`가 NULL인 것만으로 앱 로그인이 실패했다고 판단하지 않는다.
+
+누락된 `category`·`created_at`을 새로 추가할 때는 기본값 `'etc'`·실행 시각이 기존 행에도 채워질 수 있다. 이미 있는 컬럼의 과거 NULL 값을 소급해서 바꾸는 작업과는 구분한다.
+
+**기본 공유 정책은 GRANT와 RLS를 함께 설정한다**
+
+현재 기본 계약은 누구나 조회하고 로그인 사용자 모두가 등록·수정·삭제하는 공유형이다. RLS는 테이블 권한을 대신 부여하지 않으므로 GRANT도 맞아야 한다. ([Supabase GRANT와 RLS 정책 안내](https://supabase.com/docs/guides/database/postgres/row-level-security#grants-and-policies))
+
+컬럼이 이미 맞고 권한만 전환할 때의 예시는 다음과 같다. 기존 허용 정책은 OR로 합쳐질 수 있으므로 정책을 추가하기만 하지 않고 `public.bookmarks`의 기존 정책을 보관한 뒤 전환한다. 이 블록은 해당 테이블의 정책을 모두 교체하며, 전체 `schema.sql`을 실행했다면 다시 실행할 필요가 없다.
+
+```sql
+begin;
+
+alter table public.bookmarks enable row level security;
+grant usage on schema public to anon, authenticated;
+revoke insert, update, delete on table public.bookmarks from anon;
+grant select on table public.bookmarks to anon, authenticated;
+grant insert, update, delete on table public.bookmarks to authenticated;
+
+do $$
+declare
+  policy_row record;
+begin
+  for policy_row in
+    select policyname from pg_policies
+    where schemaname = 'public' and tablename = 'bookmarks'
+  loop
+    execute format('drop policy if exists %I on public.bookmarks', policy_row.policyname);
+  end loop;
+end;
+$$;
+
+create policy "bookmarks_public_read"
+on public.bookmarks for select
+to anon, authenticated using (true);
+
+create policy "bookmarks_authenticated_insert"
+on public.bookmarks for insert
+to authenticated with check (auth.uid() is not null);
+
+create policy "bookmarks_authenticated_update"
+on public.bookmarks for update
+to authenticated
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
+
+create policy "bookmarks_authenticated_delete"
+on public.bookmarks for delete
+to authenticated using (auth.uid() is not null);
+
+commit;
+```
+
+정책 4행이 존재한다는 것만으로 완료는 아니다. 역할·명령·조건과 스키마/테이블 권한을 확인하고, 실제 로그인 세션으로 등록·조회·수정·삭제한 행을 확인한다. 이 프로젝트에서는 등록·조회는 성공해도 수정·삭제가 HTTP 200과 반환 0행이었던 적이 있다. 전체 SQL 적용 후 실제 반환 행까지 확인해 CRUD를 검증했다.
+
+<details>
+<summary>선택 설계: 사용자 본인 북마크만 다루는 앱으로 바꾸려면</summary>
+
+이 설계는 현재 공유형 앱의 기본 설정이나 실행 순서에 포함되지 않는다. 소유자 전용으로 전환하려면 기존 `user_id IS NULL` 데이터와 계정 삭제 후 작성자가 없는 행의 처리 방식을 먼저 정하고, 다른 작성자의 수정·삭제 버튼을 숨기는 등 UI도 함께 바꿔야 한다.
+
+그때의 정책 조건 예시는 다음과 같다. 기존 공유 허용 정책을 남긴 채 추가하면 OR로 결합되어 소유자 제한이 되지 않으므로, 별도 설계·검증 뒤 기존 정책을 교체해야 한다.
+
+| 명령 | 소유자 전용 조건 예시 |
+| --- | --- |
+| SELECT | `USING (auth.uid() = user_id)` |
+| INSERT | `WITH CHECK (auth.uid() = user_id)` |
+| UPDATE | `USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)` |
+| DELETE | `USING (auth.uid() = user_id)` |
+
+기본 공유 정책의 `auth.uid() IS NOT NULL`은 로그인 여부를 검사한다. DB가 `user_id`와 로그인 사용자 ID의 일치까지 강제하는 조건과는 다르다. 위 선택 설계는 필요한 경우 별도 변경으로 다룬다.
+
+</details>
+
+### 4. 배포 전후 체크리스트
+
+다른 환경을 구성할 때 순서대로 확인하는 목록이다. 현재 배포의 실제 검사 결과는 아래 [현재 배포 확인 범위](#현재-배포-확인-범위)에 기록했다.
+
+- [ ] 사용할 Supabase 프로젝트의 URL과 공개 키를 같은 프로젝트에서 가져왔다.
+- [ ] 필요한 Vercel 환경에만 값을 설정하고 변경 후 다시 배포했다. 서비스 역할 키·계정 비밀번호를 `VITE_` 변수에 넣지 않았다.
+- [ ] 공유 프로젝트의 기존 Site URL·허용 주소를 유지하고 이 앱과 필요한 개별 Preview/로컬 복귀 주소를 허용했다.
+- [ ] 해당 환경의 `VITE_APP_URL` 또는 origin fallback이 의도한 메일 복귀 주소를 만든다.
+- [ ] 진단 SQL로 7개 컬럼·기본값·제약과 스키마/테이블 권한·RLS 조건을 확인했다.
+- [ ] 비로그인 공개 조회와 비로그인 쓰기 차단, 로그인 사용자의 등록·조회·수정·삭제를 실제 역할로 확인했다.
+- [ ] 수정·삭제는 HTTP 200만 보지 않고 실제 반환 행과 변경 결과를 확인했다.
+- [ ] `/bookmarks/new` 직접 접근·새로고침·Not Found UI와 로그인 후 원래 경로 복귀를 확인했다.
+- [ ] 같은 origin에서 새로고침할 때 세션 복원과 로딩·오류 처리를 확인했다.
+- [ ] 새 가입 확인 메일을 수신하고 링크가 이 앱으로 돌아오는 것을 확인했다.
+- [ ] 검증용 북마크와 세션을 정리하고 로그·문서에 실제 토큰이나 사용자 식별값을 남기지 않았다.
 
 ---
 
