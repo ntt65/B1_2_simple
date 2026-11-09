@@ -4,6 +4,8 @@
  * 전체 북마크 목록을 가져오고 카테고리 필터로 클라이언트 사이드 필터링한다.
  */
 import { useMemo, useState } from "react";	// useMemo: 필터 결과 메모이제이션, useState: 선택 카테고리
+import { Link } from "react-router-dom";
+import { Button } from "../components/Button";
 import { useBookmarks } from "../hooks/useBookmarks";	// 목록 조회 훅
 import { BookmarkList } from "../components/BookmarkList";	// 카드 목록 UI
 import { CategoryFilter } from "../components/CategoryFilter";	// 카테고리 탭 필터
@@ -30,7 +32,16 @@ export function BookmarksPage() {
 
       {loading && <Loading message="북마크를 불러오는 중..." />}	{/* 로딩 중 스피너 표시 */}
       {!loading && error && <ErrorState message="요청에 실패했습니다. 다시 시도하세요." onRetry={refetch} />}	{/* 에러 시 메시지 + 재시도 버튼 */}
-      {!loading && !error && <BookmarkList bookmarks={filtered} />}	{/* 정상 시 필터링된 목록 렌더 */}
+      {!loading && !error && (
+        <BookmarkList
+          bookmarks={filtered}
+          emptyAction={bookmarks.length > 0 ? (
+            <Button variant="secondary" onClick={() => setCategory("all")}>전체 카테고리 보기</Button>
+          ) : (
+            <Link className="btn btn-primary" to="/bookmarks/new">첫 북마크 등록하기</Link>
+          )}
+        />
+      )}
     </section>
   );
 }

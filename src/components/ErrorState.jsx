@@ -12,7 +12,7 @@ export function ErrorState({ message = "요청에 실패했습니다. 다시 시
   return (
     <div className="state state-error" role="alert">	{/* role="alert"으로 스크린 리더에 에러 알림 */}
       <p>{message}</p>	{/* 에러 메시지 */}
-      {onRetry && (	{/* onRetry 핸들러가 있을 때만 재시도 버튼 렌더 */}
+      {onRetry && (
         <Button variant="secondary" onClick={onRetry}>	{/* secondary 스타일 재시도 버튼 */}
           다시 시도
         </Button>

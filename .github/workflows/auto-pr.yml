@@ -1,8 +1,8 @@
-name: Auto PR to upstream
+name: Manual PR to upstream
 
 on:
-  push:
-    branches: [main]
+  # simple 배포를 위한 push가 다른 저장소에 PR을 만들지 않도록 수동 실행한다.
+  workflow_dispatch:
 
 jobs:
   create-pr:

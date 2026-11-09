@@ -2,6 +2,8 @@
 
 > 기술 스택 상세: [tech.md](./tech.md)
 
+2026-11-10 기준 구현 설명이다. 사용자 Context와 인증 보너스를 추가했다. 코드 구현과 원격 환경 검증을 구분하며, 인증 추가 버전의 실제 Supabase 정책 적용·메일 확인·배포 CRUD는 별도 확인이 필요하다.
+
 ---
 
 ## 항목 1
@@ -10,18 +12,20 @@
 
 **✅**
 
-`App.jsx`에서 React Router v7로 6개 라우트를 선언했다.
+`App.jsx`에서 React Router v7로 8개 라우트를 선언했다.
 
 | 경로 | 컴포넌트 | 동작 |
 | --- | --- | --- |
 | `/` | `HomePage` | 서비스 소개 + CTA |
 | `/bookmarks` | `BookmarksPage` | 목록 + 카테고리 필터 |
-| `/bookmarks/new` | `BookmarkNewPage` | 등록 폼 |
-| `/bookmarks/:id` | `BookmarkDetailPage` | 상세 + 삭제 |
-| `/bookmarks/:id/edit` | `BookmarkEditPage` | 수정 폼 |
+| `/bookmarks/new` | `ProtectedRoute` → `BookmarkNewPage` | 로그인 후 등록 폼 |
+| `/bookmarks/:id` | `BookmarkDetailPage` | 공개 상세 + 로그인 사용자 수정·삭제 |
+| `/bookmarks/:id/edit` | `ProtectedRoute` → `BookmarkEditPage` | 로그인 후 수정 폼 |
+| `/login` | `LoginPage` | 이메일 로그인·회원가입, 로그인 후 원래 경로 복귀 |
+| `/profile` | `ProtectedRoute` → `ProfilePage` | 로그인 사용자 정보·로그아웃 |
 | `*` | `NotFoundPage` | "404 페이지를 찾을 수 없습니다." + 홈으로 링크 |
 
-`/bookmarks/new`를 `/bookmarks/:id`보다 앞에 선언해서 `new`가 id로 매칭되는 충돌을 방지했다. `vercel.json`의 rewrite 규칙으로 배포 환경에서 직접 URL 접근 시에도 React Router가 처리한다.
+React Router는 정적 경로인 `/bookmarks/new`를 동적 경로 `/bookmarks/:id`보다 우선 매칭한다. `vercel.json`의 rewrite 규칙으로 배포 환경에서 직접 URL 접근 시에도 React Router가 처리한다. 보호 라우트는 초기 세션 확인 중 로딩 UI를 표시하고, 비로그인 사용자는 원래 내부 경로를 담아 `/login`으로 이동시킨다.
 
 ---
 
@@ -34,10 +38,12 @@
 | 목록 조회 | `useBookmarks.js` | `.from("bookmarks").select("*").order("created_at", { ascending: false })` |
 | 상세 조회 | `useBookmark.js` | `.from("bookmarks").select("*").eq("id", id).maybeSingle()` |
 | 등록 | `BookmarkNewPage` → `handleCreate` | `.from("bookmarks").insert(values).select().single()` |
-| 수정 | `BookmarkEditPage` → `handleUpdate` | `.from("bookmarks").update(values).eq("id", id)` |
-| 삭제 | `BookmarkDetailPage` → `handleDelete` | `.from("bookmarks").delete().eq("id", id)` |
+| 수정 | `BookmarkEditPage` → `handleUpdate` | `.from("bookmarks").update(values).eq("id", id).select("id").maybeSingle()` |
+| 삭제 | `BookmarkDetailPage` → `handleDelete` | `.from("bookmarks").delete().eq("id", id).select("id").maybeSingle()` |
 
 성공/실패 후 흐름: 등록 성공 → 새 레코드 상세(`/bookmarks/:id`) 이동. 수정 성공 → 해당 상세 이동. 삭제 성공 → 목록(`/bookmarks`) 이동.
+
+등록·수정·삭제는 로그인 세션을 확인한다. 수정·삭제에서 반환된 행이 없으면 성공으로 이동하지 않고 실패를 표시한다. 원격 권한은 `schema.sql`과 기존 DB용 `supabase/policies-authenticated-writes.sql`에 공개 조회·로그인 사용자 쓰기로 정의했다. 로그인 사용자 사이에 작성자별 소유권은 구분하지 않는다.
 
 ---
 
@@ -51,7 +57,7 @@
 | --- | --- | --- |
 | 로딩 중 | `Loading` | CSS 스피너 + 메시지, `role="status"` |
 | 에러 | `ErrorState` | 메시지 + 재시도 버튼(선택), `role="alert"` |
-| 빈 데이터 | `EmptyState` | 안내 메시지 + 선택적 액션 |
+| 빈 데이터 | `EmptyState` | 등록 유도 또는 필터 초기화 액션과 안내 메시지 |
 
 `BookmarksPage`, `BookmarkDetailPage`, `BookmarkEditPage` 세 화면 모두 동일한 패턴으로 처리한다.
 
@@ -69,7 +75,7 @@
 
 `BookmarkForm.jsx`가 등록·수정 양쪽에서 공용으로 처리한다.
 
-- **필수값 검증**: `validate()` 함수가 `title`, `url`의 `trim()` 결과가 빈 문자열이면 에러 객체를 반환한다.
+- **필수값 검증**: `validate()` 함수가 `title`, `url`의 `trim()` 결과가 빈 문자열이면 에러 객체를 반환한다. URL은 `bookmarkUrl.js`로 파싱 가능한 HTTP/HTTPS 절대 주소인지도 확인한다.
 - **에러 메시지**: `errors` state가 채워지면 `Input` 컴포넌트가 필드 아래에 `<p className="field-error">` 를 렌더하고 `invalid` 클래스로 테두리를 빨갛게 표시한다. 다시 입력을 시작하는 순간 해당 필드 에러가 지워진다.
 - **제출 중 상태**: `submitting: true`이면 `Button`이 `disabled`되고 텍스트가 "처리 중..."으로 바뀐다. `try/finally`로 성공·실패 무관하게 제출 완료 시 해제된다.
 - **요청 실패**: Supabase 에러 시 페이지가 `submitError` prop을 내려주고 폼 상단에 표시된다.
@@ -78,11 +84,14 @@
 
 ### Q. 배포된 URL에서 CRUD를 포함한 모든 기능이 정상 동작하는가?
 
-**✅**
+**확인 필요 — 인증 추가 버전의 원격 검증 전**
 
-- 배포 URL: https://codyssey-b1-2.vercel.app
-- Vercel 환경변수에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 등록 완료
-- 목록 조회 / 카테고리 필터 / 상세 / 등록 / 수정 / 삭제 / Not Found 전부 배포 환경에서 동작 확인
+- 기존 문서의 배포 URL은 https://codyssey-b1-2.vercel.app 이며, 현재 저장소·인증 추가 버전과의 배포 연결 상태는 별도 확인해야 한다.
+- Vercel에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`와 필요 시 `VITE_APP_URL`을 등록하고 재배포한다.
+- Supabase에서 이메일 인증·인증 메일 복귀 주소를 설정하고 기존 DB용 쓰기 권한 SQL을 적용한다.
+- 비로그인 공개 조회와 쓰기 차단, 가입 메일 확인, 로그인 후 등록·수정·삭제·프로필·로그아웃을 실제 배포 주소에서 확인해야 한다.
+
+이번 변경의 자동 테스트는 외부 Supabase 응답을 대체한다. 실제 원격 DB·메일·배포 성공을 의미하지 않는다.
 
 ---
 
@@ -90,7 +99,7 @@
 
 ### Q. 데이터 조회/갱신 흐름 중 최소 1개 이상이 커스텀 훅으로 분리되어 있고 왜 분리했는지 설명할 수 있는가?
 
-**✅ — 2개 훅**
+**✅ — 조회 훅 2개와 인증 훅 1개**
 
 **`src/hooks/useBookmarks.js`** — 목록 조회
 ```js
@@ -121,6 +130,8 @@ export function useBookmark(id) {
 ```
 - 사용처: `BookmarkDetailPage`, `BookmarkEditPage` (2곳)
 
+**`src/hooks/useAuth.js`** — `AuthContext`의 로그인 사용자·세션 확인 상태와 로그인·가입·로그아웃 함수를 사용한다. 헤더·로그인·프로필·보호 라우트가 같은 사용자 상태를 공유한다.
+
 **분리한 이유:**
 1. **관심사 분리**: 페이지 컴포넌트가 Supabase 쿼리를 몰라도 된다. `{ loading, error, data, refetch }`만 받아 화면에 집중한다.
 2. **재사용 제거 중복**: `useBookmark(id)` 없이 구현하면 `BookmarkDetailPage`와 `BookmarkEditPage` 두 곳에 동일한 `useState` + `useEffect` + Supabase 코드가 중복된다.
@@ -137,22 +148,24 @@ export function useBookmark(id) {
 ```
 src/
 ├── pages/       ← 라우트 1:1 대응, 부수 효과(Supabase 요청, navigate) 담당
-├── components/  ← props만 받아 렌더, 외부 의존성 없음
-├── hooks/       ← 비동기 상태 로직 캡슐화
-└── lib/         ← 외부 클라이언트 초기화(supabase.js), 상수(constants.js)
+├── components/  ← 재사용 UI·공통 레이아웃·보호 라우트
+├── hooks/       ← 조회 상태와 인증 Context 사용
+├── context/     ← 로그인 사용자·초기 세션·인증 이벤트 공유
+└── lib/         ← 외부 클라이언트 초기화·상수·인증 복귀 주소 검증
 ```
 
 **이 구조를 선택한 이유:**
 
-- `pages/`와 `components/`를 나누면 UI 컴포넌트가 Supabase나 Router에 의존하지 않는다. props만 바꿔서 어디서든 재사용할 수 있고 테스트도 쉽다.
+- `pages/`는 한 화면의 요청·이동 흐름을 조정하고, `components/`는 버튼·입력·폼·상태 표시를 재사용한다. `Layout`·링크 카드·`ProtectedRoute`처럼 Router나 인증 Context를 사용하는 컴포넌트도 있다.
 - `hooks/`를 별도 폴더로 두면 "이 폴더 안의 파일은 상태 로직만 있다"는 약속이 된다. 나중에 로직을 찾거나 수정할 때 위치가 예측 가능하다.
 - `lib/`는 앱 전체에서 쓰는 싱글턴(Supabase 클라이언트)과 상수를 분리한다. `supabase.js`를 여러 파일에서 import해도 항상 동일한 인스턴스를 쓴다.
+- `context/`는 페이지가 바뀌어도 함께 사용하는 사용자 상태를 보관한다. Supabase 하나만 사용하므로 LocalStorage 전환이나 중간 공통 CRUD API 계층은 추가하지 않았다.
 
 ---
 
 ### Q. 최소 8개 이상의 재사용 컴포넌트가 있고 어떤 기준으로 컴포넌트를 나눴는지 구체적으로 말할 수 있는가?
 
-**✅ — 13개**
+**✅ — 기존 공용 UI 13개와 보호 라우트**
 
 나누는 기준은 두 가지였다.
 
@@ -166,6 +179,7 @@ src/
 - `Card`: 흰 카드 컨테이너 역할만 (내용을 모름)
 - `BookmarkCard`: 카드 한 장 렌더만 (목록이나 데이터 가져오는 방법을 모름)
 - `BookmarkList`: 배열을 받아 카드를 나열하거나 EmptyState를 보여주는 역할만
+- `ProtectedRoute`: 세션 확인과 비로그인 이동을 등록·수정·프로필 라우트에서 공통 처리
 
 ---
 
@@ -185,13 +199,15 @@ if (loading) return <Loading message="북마크를 불러오는 중..." />;
 if (error)   return <ErrorState message="요청에 실패했습니다." onRetry={refetch} />;
 ```
 
-빈 상태는 `BookmarkList` 내부에서 `EmptyState`를 렌더한다. 페이지가 빈 배열인지 직접 판단하지 않는다.
+빈 상태의 공통 화면은 `BookmarkList` 내부에서 `EmptyState`를 사용해 렌더한다. 페이지는 데이터·필터 상황에 맞는 액션을 전달한다.
+
+`BookmarksPage`는 빈 목록에 맞는 `emptyAction`을 전달한다. 전체 북마크가 없으면 등록으로 안내하고, 카테고리 필터에만 결과가 없으면 전체 카테고리로 되돌린다. 비로그인 사용자의 등록 접근은 보호 라우트가 로그인으로 연결한다.
 
 ---
 
 ### Q. 커스텀 훅으로 분리한 데이터 흐름이 1개 이상 있고 왜 훅으로 분리했는지 이유를 말할 수 있는가?
 
-앞의 항목 2 첫 번째 답변과 동일하다. `useBookmarks`, `useBookmark(id)` 2개 존재. 분리 이유: 관심사 분리 + 재사용 + 외부 `refetch` 호출 가능.
+앞의 항목 2 첫 번째 답변과 동일하다. 조회 훅 `useBookmarks`, `useBookmark(id)`와 인증 훅 `useAuth`가 있다. 조회 훅의 분리 이유는 관심사 분리·재사용·외부 `refetch` 호출이며, `useAuth`는 여러 화면이 같은 사용자 Context를 사용하도록 한다.
 
 ---
 
@@ -221,6 +237,10 @@ BookmarkForm
 
 BookmarkNewPage / BookmarkEditPage
   └─ submitError (state)         ← Supabase 에러 메시지. 페이지가 소유하고 BookmarkForm에 prop으로 전달
+
+AuthProvider
+  └─ user, loading, sessionError ← 초기 세션 확인·인증 이벤트 결과. useAuth로 여러 화면이 공유
+      → 헤더 메뉴, 프로필, ProtectedRoute의 화면 분기
 ```
 
 ---
@@ -251,6 +271,8 @@ useEffect(() => {
 
 의존성 배열의 역할: React가 이전 렌더와 현재 렌더의 배열 값을 비교(`Object.is`)해서 하나라도 달라졌으면 effect를 재실행한다. 빈 배열 `[]`이면 비교할 대상이 없어 마운트 1회만 실행된다.
 
+여기서 1회는 일반적인 마운트 흐름을 설명한다. 개발 모드의 StrictMode는 Effect를 추가 실행하므로 개발 중 추가 조회가 보일 수 있다. 인증 Context도 Effect 정리에서 이벤트 구독을 해제한다.
+
 기술 상세 → [tech.md — useEffect + useCallback 패턴](./tech.md#useeffect--usecallback-패턴)
 
 ---
@@ -274,13 +296,13 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 // BookmarkList 내부: data.length === 0 → <EmptyState />  // 빈 데이터
 ```
 
-네 가지 상태가 `loading`과 `error` 두 boolean 조합으로 완전히 구분되어 겹치지 않는다.
+`loading` 여부와 `error` 값, 조회한 데이터의 유무로 네 가지 상태가 겹치지 않게 구분된다.
 
 ---
 
 ### Q. 상태 변경이 화면 변화로 이어지는 지점을 3군데 이상 코드에서 짚어가며 설명할 수 있는가?
 
-**✅ — 5곳**
+**✅ — 7곳**
 
 | # | 상태 변경 | 화면 변화 | 파일 |
 | --- | --- | --- | --- |
@@ -289,6 +311,8 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 | 3 | `errors.title` 설정 (제출 시 검증 실패) | `Input`에 `invalid` 클래스 + 필드 아래 에러 `<p>` 나타남 | `BookmarkForm.jsx` |
 | 4 | `submitting: false → true` | `Button` 텍스트 "처리 중..." + `disabled` | `BookmarkForm.jsx` |
 | 5 | `deleteError` 설정 (삭제 실패) | 상세 페이지 삭제 버튼 위에 에러 메시지 나타남 | `BookmarkDetailPage.jsx` |
+| 6 | 로그인·로그아웃으로 `user` 변경 | 헤더·프로필·쓰기 메뉴와 보호 라우트가 함께 바뀜 | `AuthContext.jsx`, `Layout.jsx`, `ProtectedRoute.jsx` |
+| 7 | 저장·삭제 성공 안내 전달·닫기 | 이동한 화면 상단에 성공 메시지를 표시하거나 숨김 | 각 CRUD 페이지, `Layout.jsx` |
 
 ---
 
@@ -302,6 +326,7 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 1. [라우팅]
    네비게이션 "새 북마크" 클릭
    → React Router가 /bookmarks/new 매칭
+   → ProtectedRoute에서 세션 확인 (비로그인이면 로그인 후 원래 경로로 복귀)
    → BookmarkNewPage 렌더
 
 2. [컴포넌트 + 상태 초기화]
@@ -325,6 +350,7 @@ const [error, setError] = useState(null);      // 실패 시 메시지
    await onSubmit(values) → BookmarkNewPage의 handleCreate 실행
    → supabase.insert(values).select().single()
    → 성공: navigate("/bookmarks/{새 id}") → 상세 페이지로 이동
+   → Layout이 이동 결과의 성공 안내를 role="status"로 표시
    → 실패: submitError state 설정 → BookmarkForm 상단 에러 메시지 렌더
    → finally: setSubmitting(false)
 ```
@@ -341,7 +367,7 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 | --- | --- | --- |
 | DB 구조 | PostgreSQL — 컬럼·타입 명확, `schema.sql`로 버전 관리 가능 | NoSQL — 단순 CRUD에 컬렉션 설계 오버헤드 |
 | SDK 가독성 | `.from("bookmarks").select("*").order(...)` — SQL과 1:1 | `.collection("bookmarks").orderBy(...)` — Firebase 전용 문법 |
-| 보안 근거 명시 | RLS 정책을 `schema.sql`에 SQL로 작성 — "왜 anon 키가 안전한가" 코드로 증명 | Rules 파일 별도 — 연결이 덜 명확 |
+| 권한 관리 | `schema.sql`로 공개 조회·로그인 사용자 쓰기 정책 관리 | Security Rules로 데이터 접근 권한 관리 |
 
 **연동 중 겪은 어려움과 해결:**
 
@@ -349,7 +375,8 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 | --- | --- | --- |
 | `useEffect` 무한 루프 | `refetch`를 `useCallback` 없이 의존성에 넣어 렌더마다 새 함수 참조 생성 | `useCallback([])` / `useCallback([id])`로 메모이제이션 |
 | `.single()` PostgrestError | 없는 id 조회 시 결과가 0건이어서 에러 발생 | `.maybeSingle()`로 교체 — 없으면 `null` 반환 |
-| 배포 후 흰 화면 | Vercel에 환경변수 미등록 → `supabase.js` 상단 `throw` 실행 | Vercel 대시보드 → Environment Variables 등록, 재배포 |
+| 배포 후 흰 화면 (이전 구현) | 환경변수 누락 시 모듈 초기화에서 예외 발생 | 현재는 설정 안내 화면 표시. 환경변수를 등록한 뒤 재시작·재배포 |
+| 수정·삭제가 0행인데 성공처럼 이동 | 권한 거부나 대상 삭제에도 요청 오류가 없을 수 있음 | 변경된 행을 반환받아 확인하고, 없으면 실패 표시 |
 
 상세 → [tech.md — Supabase 선택 이유](./tech.md#supabase-선택-이유)
 
@@ -361,9 +388,13 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 | 보너스 항목 | 구현 | 내용 |
 | --- | --- | --- |
-| 전역 상태 (Context) | ❌ | 미구현 |
+| 전역 상태 (Context) | ✅ | `AuthProvider`가 초기 세션·인증 이벤트를 관리하고 `useAuth`를 통해 사용자 상태를 헤더·로그인·프로필·보호 라우트에 공유 |
 | 성능 최적화 (메모이제이션) | ✅ | `BookmarksPage`에서 `useMemo`로 카테고리 필터 결과 메모이제이션 — `bookmarks`나 `category`가 바뀔 때만 재계산. 두 커스텀 훅에서 `useCallback`으로 `refetch` 메모이제이션 — `useEffect` 무한 루프 방지 |
-| 인증 (Supabase Auth + 보호 라우트) | ❌ | 미구현 |
+| 인증 (Supabase Auth + 보호 라우트) | ✅ | 이메일 로그인·회원가입·로그아웃, 등록·수정·프로필 보호, 로그인 후 원래 내부 경로 복귀, 가입 확인 메일 안내 |
+
+인증 흐름은 `main.jsx`의 `AuthProvider` → `AuthContext.jsx`의 세션 확인·이벤트 구독 → `useAuth` → 각 화면의 조건부 렌더링으로 이어진다. `LoginPage`는 제출 중 버튼·모드 전환을 잠그고 실패 시 입력을 유지한다. 가입 직후 세션이 없으면 메일 확인 안내를 표시한다. 복귀 경로는 `authRedirect.js`에서 검증해 외부 주소로 이동하지 않도록 한다.
+
+보호 라우트와 쓰기 UI는 정상 화면 접근을 제어하며, 직접 HTTP 요청에 대한 데이터 권한은 Supabase에 실제 적용된 RLS가 결정한다. 이 저장소의 SQL은 로그인 사용자 모두에게 북마크 쓰기를 허용하는 공유 데이터 정책이다.
 
 ---
 
@@ -371,10 +402,10 @@ const [error, setError] = useState(null);      // 실패 시 메시지
 
 | 항목 | 결과 |
 | --- | --- |
-| 항목 1 — 동작 검증 | ✅ 전항목 충족 |
+| 항목 1 — 동작 검증 | 코드 구현 완료. 인증 추가 버전의 실제 원격·배포 CRUD 확인 필요 |
 | 항목 2 — 구조 설명 | ✅ 전항목 설명 가능 |
 | 항목 3 — React 개념 | ✅ 전항목 코드 기준 설명 가능 |
 | 항목 4 — 통합 흐름 | ✅ 등록 흐름 전 단계 추적 가능 |
-| 항목 5 — 보너스 | ✅ 성능 최적화 (`useMemo`, `useCallback`) 구현 |
+| 항목 5 — 보너스 | ✅ 전역 사용자 Context·메모이제이션·Supabase Auth 및 보호 라우트 구현 |
 
-**필수 항목 전부 충족, 보너스 1개 추가 구현.**
+**필수 기능과 보너스 3개를 코드에 구현했다. 배포 완료 여부는 실제 원격 DB 정책·인증 메일·배포 CRUD 검증 후 판단한다.**

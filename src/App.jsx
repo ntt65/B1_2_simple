@@ -1,33 +1,34 @@
-/**
- * @file App.jsx
- * @overview 라우트 트리의 루트. Layout을 공통 부모로 두고 6개 라우트를 선언한다.
- */
-import { Routes, Route } from "react-router-dom";	// React Router v6 라우팅 컴포넌트
-import { Layout } from "./components/Layout";	// 헤더+네비게이션 공통 레이아웃
-import { HomePage } from "./pages/HomePage";	// / 경로 홈 화면
-import { BookmarksPage } from "./pages/BookmarksPage";	// /bookmarks 목록 화면
-import { BookmarkDetailPage } from "./pages/BookmarkDetailPage";	// /bookmarks/:id 상세 화면
-import { BookmarkNewPage } from "./pages/BookmarkNewPage";	// /bookmarks/new 등록 화면
-import { BookmarkEditPage } from "./pages/BookmarkEditPage";	// /bookmarks/:id/edit 수정 화면
-import { NotFoundPage } from "./pages/NotFoundPage";	// * 매칭 실패 시 404 화면
+/** 공개 조회 화면과 로그인이 필요한 화면을 구분하는 라우트 트리. */
+import { Routes, Route } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SetupNotice } from "./components/SetupNotice";
+import { isSupabaseConfigured } from "./lib/supabase";
+import { HomePage } from "./pages/HomePage";
+import { BookmarksPage } from "./pages/BookmarksPage";
+import { BookmarkDetailPage } from "./pages/BookmarkDetailPage";
+import { BookmarkNewPage } from "./pages/BookmarkNewPage";
+import { BookmarkEditPage } from "./pages/BookmarkEditPage";
+import { LoginPage } from "./pages/LoginPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
-/**
- * 앱 라우트 트리를 반환하는 루트 컴포넌트.
- * Layout이 Outlet을 통해 하위 라우트를 렌더링한다.
- */
-function App() {
+export default function App() {
+  if (!isSupabaseConfigured) return <SetupNotice />;
   return (
-    <Routes>	{/* 경로 매칭 컨테이너 */}
-      <Route element={<Layout />}>	{/* 모든 페이지에 공통 레이아웃 적용 */}
-        <Route path="/" element={<HomePage />} />	{/* 홈 */}
-        <Route path="/bookmarks" element={<BookmarksPage />} />	{/* 북마크 목록 */}
-        <Route path="/bookmarks/new" element={<BookmarkNewPage />} />	{/* 새 북마크 등록 — :id/edit보다 앞에 선언해야 충돌 없음 */}
-        <Route path="/bookmarks/:id" element={<BookmarkDetailPage />} />	{/* 북마크 상세 */}
-        <Route path="/bookmarks/:id/edit" element={<BookmarkEditPage />} />	{/* 북마크 수정 */}
-        <Route path="*" element={<NotFoundPage />} />	{/* 매칭 실패 시 404 */}
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/bookmarks" element={<BookmarksPage />} />
+        <Route path="/bookmarks/:id" element={<BookmarkDetailPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/bookmarks/new" element={<BookmarkNewPage />} />
+          <Route path="/bookmarks/:id/edit" element={<BookmarkEditPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );
 }
-
-export default App;	// Vite가 main.jsx에서 default import로 사용

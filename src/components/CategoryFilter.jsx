@@ -13,11 +13,11 @@ import { CATEGORY_FILTER_OPTIONS } from "../lib/constants";	// "전체" 포함 �
 export function CategoryFilter({ value, onChange }) {
   return (
     <Select
-      label="카테고리"	{/* 드롭다운 라벨 */}
-      id="category-filter"	{/* label 연결 id */}
-      value={value}	{/* 부모가 소유한 선택 상태 */}
-      onChange={(e) => onChange(e.target.value)}	{/* Select의 e.target.value를 꺼내 부모 핸들러 호출 */}
-      options={CATEGORY_FILTER_OPTIONS}	{/* "전체 카테고리" 포함 옵션 */}
+      label="카테고리"
+      id="category-filter"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      options={CATEGORY_FILTER_OPTIONS}
     />
   );
 }

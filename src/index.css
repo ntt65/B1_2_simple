@@ -123,3 +123,23 @@ h1, h2, h3 { color: var(--text-h); }
 
 .detail-actions { display: flex; gap: 10px; margin-top: 20px; }
 .meta { font-size: 13px; opacity: 0.7; margin-top: 12px; }
+
+.app-shell { flex: 1; }
+.app-header { gap: 16px; flex-wrap: wrap; }
+.app-header nav { flex-wrap: wrap; align-items: center; }
+.auth-page { max-width: 480px; margin: 0 auto; }
+.auth-form { margin-top: 20px; }
+.auth-actions, .detail-actions, .home-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.profile-details { display: grid; grid-template-columns: auto 1fr; gap: 12px 20px; }
+.profile-details dt { font-weight: 600; }
+.profile-details dd { margin: 0; overflow-wrap: anywhere; }
+.form-success { padding: 12px; border: 1px solid var(--accent); border-radius: 6px; }
+.setup-notice { max-width: 680px; }
+.success-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; margin-bottom: 20px; border: 1px solid var(--accent); border-radius: 6px; }
+.bookmark-memo { white-space: pre-wrap; }
+
+@media (max-width: 560px) {
+  .app-header { align-items: flex-start; }
+  .app-header nav { gap: 12px; font-size: 14px; }
+  .app-main { padding-inline: 16px; }
+}
